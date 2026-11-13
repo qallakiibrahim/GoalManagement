@@ -996,7 +996,10 @@ tr.click:hover { background: #f7fbfd; cursor: pointer; }
 :root[data-theme="dark"] .tab.active{color:var(--teal);border-bottom-color:var(--teal)}
 
 :root[data-theme="dark"] .progress,:root[data-theme="dark"] .bar{background:#1d2c3c}
-:root[data-theme="dark"] .pillar{background:#131f2c;border-color:#243649}
+:root[data-theme="dark"] .pillar{background:#131f2c;border-left-color:#243649;border-right-color:#243649;border-bottom-color:#243649;border-top:4px solid var(--teal)}
+:root[data-theme="dark"] .pillar.ohs{border-top-color:#d96b84}
+:root[data-theme="dark"] .pillar.environment{border-top-color:#3fb978}
+:root[data-theme="dark"] .pillar.quality{border-top-color:#5b93e0}
 :root[data-theme="dark"] .pillar .title{color:#eef5fc}
 
 :root[data-theme="dark"] .node{background:#14202d;border-color:#283b4e;border-left-color:var(--teal)}
