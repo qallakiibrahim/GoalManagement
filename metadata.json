@@ -1,0 +1,6 @@
+{
+  "name": "SafeQMS Goal Management",
+  "description": "SafeQMS Goal Management & Strategy Deployment v5.4 - Full-scope Visual Hoshin Kanri X-Matrix with dynamic scaling, indirect corporate hierarchy, initiative assignment indicators, Catchball alignment, ISO compliance, Bowling charts, and A3 problem solving.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
