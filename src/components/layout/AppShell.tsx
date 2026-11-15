@@ -23,7 +23,6 @@ import {
   PanelLeftOpen,
   Plus,
   RefreshCw,
-  Settings,
   ShieldCheck,
   Sun,
   Target,
@@ -250,10 +249,6 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         { route: 'management', label: 'Management Review', icon: FileSpreadsheet, hidden: isBasic },
       ],
     },
-    {
-      title: 'Administration',
-      items: [{ route: 'settings', label: 'Team & Settings', icon: Settings, hidden: !isActualAdmin }],
-    },
   ];
 
   // Unread Catchball notifications for current role
@@ -343,22 +338,22 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--ink)] flex flex-col">
-      {/* 3-Zone Topbar */}
-      <header className="sticky top-0 z-30 h-14 border-b border-[var(--border)] bg-[var(--surface)] px-4 flex items-center justify-between gap-4 no-print">
-        {/* Zone 1: Left Brand + Workspace */}
-        <div className="flex items-center gap-2.5 min-w-0 shrink-0">
+      {/* Top Header */}
+      <header className="sticky top-0 z-30 h-14 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur px-4 flex items-center justify-between gap-4 no-print">
+        {/* Left: Navigation Toggle + Brand + Active Workspace */}
+        <div className="flex items-center gap-2 min-w-0 shrink-0">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="lg:hidden rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] cursor-pointer"
+            className="lg:hidden h-8 w-8 inline-flex items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] transition-colors cursor-pointer"
             aria-label="Open navigation"
           >
-            <Menu className="w-5 h-5" />
+            <Menu className="w-4 h-4" />
           </button>
           <button
             type="button"
             onClick={toggleSidebarCollapsed}
-            className="hidden lg:inline-flex rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] cursor-pointer"
+            className="hidden lg:inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] transition-colors cursor-pointer"
             aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
@@ -367,43 +362,38 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           <button
             type="button"
             onClick={() => navigate('overview')}
-            className="flex items-center gap-2 text-left cursor-pointer whitespace-nowrap shrink-0"
+            className="flex items-center gap-2 text-left cursor-pointer whitespace-nowrap shrink-0 rounded-lg py-1 pr-1 hover:opacity-90 transition-opacity"
           >
             <div className="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0">
               <ShieldCheck className="w-4 h-4" />
             </div>
             <span className="text-sm font-bold tracking-tight text-[var(--ink)]">SafeQMS</span>
           </button>
-          {activeWorkspace && (
-            <span className="hidden sm:inline text-xs text-[var(--muted)] truncate max-w-[180px]">
-              · {activeWorkspace.name}
-            </span>
-          )}
         </div>
 
-        {/* Zone 2: Center Breadcrumb */}
-        <div className="hidden md:flex items-center gap-1.5 text-xs text-[var(--muted)] whitespace-nowrap min-w-0">
-          <span>SafeQMS</span>
-          <span>/</span>
-          <span className="font-semibold text-[var(--ink)] truncate">{ROUTE_TITLES[route] || route}</span>
+        {/* Center: Active Page Title */}
+        <div className="hidden md:flex items-center justify-center min-w-0">
+          <span className="text-xs font-semibold text-[var(--ink)] truncate">
+            {ROUTE_TITLES[route] || route}
+          </span>
         </div>
 
-        {/* Zone 3: Right Actions */}
+        {/* Right: Primary Action, Theme & Account */}
         <div className="flex items-center gap-2 whitespace-nowrap shrink-0">
           {canCreateGoal && (
             <button
               type="button"
               onClick={() => navigate('newgoal')}
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
+              className="hidden sm:inline-flex h-8 items-center gap-1.5 rounded-lg bg-teal-600 px-3 text-xs font-semibold text-white hover:bg-teal-700 transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              New Goal
+              <span>New Goal</span>
             </button>
           )}
           <button
             type="button"
             onClick={toggleTheme}
-            className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-1.5 text-[var(--muted)] hover:text-[var(--ink)] cursor-pointer"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] transition-colors cursor-pointer"
             aria-label="Toggle color theme"
             title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
           >
@@ -415,21 +405,22 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               onClick={() => setUserMenuOpen((prev) => !prev)}
               aria-expanded={userMenuOpen}
               aria-haspopup="menu"
-              className="flex items-center gap-2 rounded-lg px-2 py-1 text-left hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer"
+              className="h-8 flex items-center gap-2 rounded-lg px-2 text-left hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer"
               title="Account & Administration"
             >
-              <div className="hidden sm:block text-right leading-tight">
-                <div className="font-semibold text-xs text-[var(--ink)] max-w-[140px] truncate">
+              <div className="w-6 h-6 rounded-md bg-teal-600/15 text-teal-700 dark:bg-teal-400/15 dark:text-teal-300 flex items-center justify-center text-[11px] font-bold shrink-0">
+                {(user.displayName || user.email || 'U')
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((p) => p[0]?.toUpperCase() || '')
+                  .join('')}
+              </div>
+              <div className="hidden sm:block text-left leading-tight">
+                <div className="font-semibold text-xs text-[var(--ink)] max-w-[130px] truncate">
                   {user.displayName || user.email}
                 </div>
-                <div className="text-[10px] text-[var(--muted)]">
-                  {activeRole}
-                  {isActualAdmin ? ' · Administration' : ''}
-                </div>
+                <div className="text-[10px] text-[var(--muted)]">{activeRole}</div>
               </div>
-              <span className="sm:hidden text-xs font-semibold text-[var(--ink)] max-w-[90px] truncate">
-                {user.displayName?.split(' ')[0] || 'Account'}
-              </span>
               <ChevronDown
                 className={`w-3.5 h-3.5 text-[var(--muted)] transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
               />
@@ -528,61 +519,24 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           }`}
         >
           {renderNavList(sidebarCollapsed)}
-          {isActualAdmin && (
-            sidebarCollapsed ? (
-              <div className="border-t border-[var(--border)] p-2 flex flex-col items-center gap-1">
-                <button
-                  type="button"
-                  onClick={toggleSidebarCollapsed}
-                  title={`Role Preview: ${activeRole} (Click to expand)`}
-                  aria-label="Expand sidebar for Admin Role Preview"
-                  className="w-full flex items-center justify-center rounded-lg py-2 text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] cursor-pointer"
-                >
-                  <UserCog className="w-[18px] h-[18px]" />
-                </button>
-              </div>
-            ) : (
-              <div className="border-t border-[var(--border)] p-3.5 space-y-2">
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                  Admin Role Preview
-                </label>
-                <select
-                  value={activeRole}
-                  onChange={(e) => setPreviewRole(e.target.value as SafeQmsRole)}
-                  className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)]"
-                >
-                  {SAFEQMS_ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-[var(--muted)] leading-snug">
-                  Firestore rules authorize writes via your authenticated Admin UID.
-                </p>
-              </div>
-            )
+          {isActualAdmin && !sidebarCollapsed && (
+            <div className="border-t border-[var(--border)] p-3.5 space-y-1.5">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                Admin Role Preview
+              </label>
+              <select
+                value={activeRole}
+                onChange={(e) => setPreviewRole(e.target.value as SafeQmsRole)}
+                className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)]"
+              >
+                {SAFEQMS_ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
-          <div className={`border-t border-[var(--border)] ${sidebarCollapsed ? 'p-2' : 'px-3 py-2'}`}>
-            <button
-              type="button"
-              onClick={toggleSidebarCollapsed}
-              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              className={`w-full flex items-center rounded-lg text-xs font-semibold text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] transition-colors cursor-pointer ${
-                sidebarCollapsed ? 'justify-center py-2' : 'gap-2 px-2.5 py-1.5'
-              }`}
-            >
-              {sidebarCollapsed ? (
-                <PanelLeftOpen className="w-4 h-4 shrink-0" />
-              ) : (
-                <>
-                  <PanelLeftClose className="w-4 h-4 shrink-0" />
-                  <span>Collapse sidebar</span>
-                </>
-              )}
-            </button>
-          </div>
         </aside>
 
         {/* Mobile Drawer */}
