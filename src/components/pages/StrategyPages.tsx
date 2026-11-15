@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2,
   ChevronDown,
@@ -339,8 +339,11 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
   const [evidenceRefs, setEvidenceRefs] = useState('');
   const [isoSearch, setIsoSearch] = useState('');
 
+  const initializedNewKey = useRef<string>('');
+
   useEffect(() => {
     if (existing) {
+      initializedNewKey.current = '';
       setTitle(existing.title);
       setLevel(existing.level);
       setParent(existing.parent || '');
@@ -361,12 +364,16 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
       setProcessRefs(existing.processRefs || '');
       setEvidenceRefs(existing.evidenceRefs || '');
     } else if (isNew) {
-      const defLevel = activeRole === 'Department director' ? ASSIGNED_DEPARTMENT : 'Site: Uppsala';
-      const parents = permittedParents(goals, defLevel);
-      setLevel(defLevel);
-      setParent(parents[0]?.id || '');
-      setGoalYear(year);
-      setIsoRefs(['req-9001-6.2']);
+      const initKey = `new:${activeRole}:${year}`;
+      if (initializedNewKey.current !== initKey) {
+        initializedNewKey.current = initKey;
+        const defLevel = activeRole === 'Department director' ? ASSIGNED_DEPARTMENT : 'Site: Uppsala';
+        const parents = permittedParents(goals, defLevel);
+        setLevel(defLevel);
+        setParent(parents[0]?.id || '');
+        setGoalYear(year);
+        setIsoRefs(['req-9001-6.2']);
+      }
     }
   }, [existing, isNew, activeRole, year, goals]);
 
@@ -791,11 +798,15 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
 };
 
 export const StrategyA3Page: React.FC = () => {
-  const { scope, year, goals, kpis, initiatives, plans, isoStandards, activeRole, domainSnapshot, navigate } = useWorkspace();
+  const { scope, year, goals, kpis, initiatives, relations, plans, isoStandards, activeRole, domainSnapshot, navigate } = useWorkspace();
   const orgGoals = goals.filter((g) => g.level === 'Organization' && visibleToRole(g, activeRole));
   const annualGoals = roleVisibleGoals(goals, scope, activeRole).filter((g) => g.level !== 'Organization');
   const activePlan = plans.find((p) => p.scope === scope) || plans[0];
-  const exceptions = initiatives.filter((i) => visibleInitiative(i, goals, activeRole));
+  const exceptions = initiatives.filter(
+    (i) =>
+      visibleInitiative(i, goals, activeRole) &&
+      (scope === 'Organization' || annualGoals.some((g) => initiativeLinkedToGoal(i, g.id, relations)))
+  );
 
   return (
     <div className="space-y-6">

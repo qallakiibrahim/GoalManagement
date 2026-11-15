@@ -219,6 +219,16 @@ export const InitiativeFormPage: React.FC = () => {
   const [description, setDescription] = useState('');
   const [sqdc, setSqdc] = useState<SqdcMatrix>({ S: 1, Q: 1, D: 2, C: 1 });
 
+  useEffect(() => {
+    if (!visibleGoals.length) {
+      if (goal) setGoal('');
+      return;
+    }
+    if (!visibleGoals.some((g) => g.id === goal)) {
+      setGoal(visibleGoals[0].id);
+    }
+  }, [visibleGoals, goal]);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !goal) return;

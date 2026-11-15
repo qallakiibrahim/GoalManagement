@@ -143,10 +143,11 @@ export const EvidencePage: React.FC = () => {
   const { scope, goals, activeRole, domainSnapshot } = useWorkspace();
   const visibleGoals = roleVisibleGoals(goals, scope, activeRole);
   const [goalFilter, setGoalFilter] = useState<string>('ALL');
+  const effectiveFilter = goalFilter === 'ALL' || visibleGoals.some((g) => g.id === goalFilter) ? goalFilter : 'ALL';
 
   const selectedGoals = useMemo(
-    () => (goalFilter === 'ALL' ? visibleGoals : visibleGoals.filter((g) => g.id === goalFilter)),
-    [visibleGoals, goalFilter]
+    () => (effectiveFilter === 'ALL' ? visibleGoals : visibleGoals.filter((g) => g.id === effectiveFilter)),
+    [visibleGoals, effectiveFilter]
   );
 
   const packet = useMemo(() => auditPacket(selectedGoals, domainSnapshot), [selectedGoals, domainSnapshot]);
@@ -169,7 +170,7 @@ export const EvidencePage: React.FC = () => {
         actions={
           <div className="flex flex-wrap gap-2 no-print">
             <select
-              value={goalFilter}
+              value={effectiveFilter}
               onChange={(e) => setGoalFilter(e.target.value)}
               className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold"
             >

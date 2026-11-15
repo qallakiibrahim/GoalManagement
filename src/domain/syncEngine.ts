@@ -231,7 +231,7 @@ export function visibleInitiative(i: Initiative | undefined, goals: StrategicGoa
   if (!i) return false;
   if (!isLimitedRole(r)) return true;
   const g = goalById(goals, i.goal);
-  return visibleToRole(g, r) && (i.goal === 'G-003' || g?.level === 'Site: Uppsala' || g?.level === 'Organization');
+  return visibleToRole(g, r);
 }
 
 export function visibleProject(
@@ -275,7 +275,9 @@ export function roleCan(
   if (verb === 'projectWrite') {
     return isAdmin || isLeadership || (isDirector && (!obj || roleCan(r, 'initiativeWrite', initById(ctx.initiatives, obj.initiative), ctx)));
   }
-  if (verb === 'kpiWrite') return isAdmin || isLeadership || (isDirector && obj?.id === 'K-002');
+  if (verb === 'kpiWrite') {
+    return isAdmin || isLeadership || (isDirector && (obj?.id === 'K-002' || ctx.goals.some((g) => g.level === ASSIGNED_DEPARTMENT && g.kpi === obj?.id)));
+  }
   if (verb === 'taskOwn') return isBasic && obj?.owner === 'Team Leader';
   if (verb === 'readAll') return !isLimitedRole(r);
   return false;

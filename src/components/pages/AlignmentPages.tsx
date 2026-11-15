@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CheckCircle2, MessageSquareMore, Plus, RefreshCw, Send } from 'lucide-react';
 import { ASSIGNED_DEPARTMENT } from '../../types/safeqms';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -84,6 +84,20 @@ export const CatchballCreatePage: React.FC = () => {
   const [due, setDue] = useState(candidates[0]?.planDue || '2027-12-31');
   const [recipientScope, setRecipientScope] = useState(ASSIGNED_DEPARTMENT);
   const [reason, setReason] = useState('');
+
+  useEffect(() => {
+    if (!candidates.length) {
+      if (goalId) setGoalId('');
+      return;
+    }
+    if (!candidates.some((g) => g.id === goalId)) {
+      const next = candidates[0];
+      setGoalId(next.id);
+      setTarget(String(next.target ?? 0));
+      setResources(next.resources || '');
+      setDue(next.planDue || '2027-12-31');
+    }
+  }, [candidates, goalId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

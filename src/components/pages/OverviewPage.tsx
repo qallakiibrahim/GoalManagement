@@ -15,6 +15,7 @@ import {
   roleVisibleGoals,
   visibleInitiative,
   visibleToRole,
+  xm4OrgParent,
   xm4ScopeIncludes,
 } from '../../domain/syncEngine';
 import { Card, SectionHeader, StatusBadge } from '../ui/Badge';
@@ -142,7 +143,11 @@ export const OverviewPage: React.FC = () => {
             const k = kpiById(kpis, pg.kpi);
             const st = computeKpiStatus(k);
             const childCount = goals.filter(
-              (c) => c.level !== 'Organization' && visibleToRole(c, activeRole) && (c.parent === pg.id || xm4ScopeIncludes(goals, c, scope, activeRole))
+              (c) =>
+                c.level !== 'Organization' &&
+                visibleToRole(c, activeRole) &&
+                xm4OrgParent(goals, c)?.id === pg.id &&
+                (scope === 'Organization' || xm4ScopeIncludes(goals, c, scope, activeRole))
             ).length;
             return (
               <button

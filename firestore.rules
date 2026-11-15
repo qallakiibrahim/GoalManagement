@@ -351,7 +351,11 @@ service cloud.firestore {
               'revision', 'updatedAt'
             ])) ||
             (isWsManagerOrDirector(workspaceId)
-              && existing().approval != 'Approved'
+              && (
+                existing().approval != 'Approved' ||
+                (incoming().approval == 'Draft' && incoming().revision == existing().revision + 1) ||
+                (incoming().approval == 'Pending' && incoming().diff(existing()).affectedKeys().hasOnly(['approval', 'updatedAt']))
+              )
               && incoming().approval in ['Draft', 'Pending']
               && incoming().diff(existing()).affectedKeys().hasOnly([
                 'title', 'parent', 'owner', 'year', 'kpi', 'baseline', 'target', 'unit',

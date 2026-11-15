@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -89,7 +89,15 @@ export const DailyBoardPage: React.FC = () => {
   const [newTitle, setNewTitle] = useState('');
   const [newRoute, setNewRoute] = useState<PulseCard['routeType']>('Direct fix');
   const [newKpi, setNewKpi] = useState('');
-  const [newOwner, setNewOwner] = useState(activeRole === 'Basic user' ? 'Team Leader' : activeRole);
+  const defaultOwnerForRole = activeRole === 'Basic user' ? 'Team Leader' : activeRole;
+  const [newOwner, setNewOwner] = useState(defaultOwnerForRole);
+  const [ownerCustomized, setOwnerCustomized] = useState(false);
+
+  useEffect(() => {
+    if (!ownerCustomized) {
+      setNewOwner(defaultOwnerForRole);
+    }
+  }, [defaultOwnerForRole, ownerCustomized]);
 
   // Drag & Drop state
   const [dragCardId, setDragCardId] = useState<string | null>(null);
@@ -155,11 +163,7 @@ export const DailyBoardPage: React.FC = () => {
   // Scoped pulse cards
   const scopedCards = useMemo(() => {
     return pulseCards.filter((c) => {
-      const matchScope =
-        dailyTier === 'tier3'
-          ? blockerMatchesScope(c.scope, scope)
-          : blockerMatchesScope(c.scope, scope);
-      if (!matchScope) return false;
+      if (!blockerMatchesScope(c.scope, scope)) return false;
       if (routeFilter !== 'ALL' && c.routeType !== routeFilter) return false;
       if (ownerFilter !== 'ALL' && c.owner !== ownerFilter) return false;
       if (searchQuery.trim()) {
@@ -304,7 +308,10 @@ export const DailyBoardPage: React.FC = () => {
               <input
                 type="text"
                 value={newOwner}
-                onChange={(e) => setNewOwner(e.target.value)}
+                onChange={(e) => {
+                  setOwnerCustomized(true);
+                  setNewOwner(e.target.value);
+                }}
                 placeholder="Owner"
                 className="md:col-span-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 text-xs text-[var(--ink)]"
               />

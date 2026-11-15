@@ -383,6 +383,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }, 3200);
   }, []);
 
+  const failMutation = useCallback(
+    (err: unknown, op: OperationType, path: string, userMsg: string): never => {
+      const detail = err instanceof Error ? err.message : String(err);
+      toast(userMsg, 'error');
+      setFirestoreError(`${userMsg} (${detail})`);
+      handleFirestoreError(err, op, path);
+    },
+    [toast]
+  );
+
   const showModal = useCallback((cfg: Omit<ModalConfig, 'isOpen' | 'resolve'>): Promise<any> => {
     return new Promise<any>((resolve) => {
       setModal({ ...cfg, isOpen: true, resolve });
@@ -894,6 +904,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const switchWorkspace = useCallback(
     async (wsId: string) => {
       setActiveWorkspaceId(wsId);
+      setLocalScope('');
+      setLocalYear('');
       setPreviewRoleState(null);
       if (user) {
         try {
@@ -1005,9 +1017,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       }
 
-      const isoRefs = Array.isArray(data.isoRefs) ? data.isoRefs : existing?.isoRefs || [];
-      const isoStr = isoRefs.map((r) => isoName(isoStandards, r)).join(' | ');
-      const kpiId = data.kpi !== undefined ? data.kpi : existing?.kpi || 'K-001';
+      const isoRefs = (Array.isArray(data.isoRefs) ? data.isoRefs : existing?.isoRefs || []).slice(0, 30);
+      const fullIsoStr = isoRefs.map((r) => isoName(isoStandards, r)).join(' | ');
+      const isoStr =
+        fullIsoStr.length <= 240
+          ? fullIsoStr
+          : isoRefs
+              .map((r) => isoName(isoStandards, r).split(' — ')[0].trim())
+              .join(' | ')
+              .slice(0, 240);
+      const kpiId = (data.kpi !== undefined ? data.kpi : existing?.kpi || 'K-001').slice(0, 128);
       const kpiObj = kpiById(kpis, kpiId);
       const perfLabel = computeKpiStatus(kpiObj).label;
       const batch = writeBatch(db);
@@ -1020,7 +1039,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         let nextApproval = existing.approval;
 
         if (existing.approval === 'Approved') {
-          const revActId = `ACT-REV-${Date.now().toString(36)}`;
+          const revActId = `ACT-REV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
           batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', revActId), {
             ...baseFields(),
             id: revActId,
@@ -1029,7 +1048,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
-          nextRev += 1;
+          nextRev = Math.min(999, nextRev + 1);
           nextApproval = 'Draft';
           addHistoryEntry(batch, `${goalId}: approved v${nextRev - 1} archived; new v${nextRev} draft created`);
         } else if (existing.approval === 'Pending') {
@@ -1047,28 +1066,28 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
 
         const updatePayload = stripUndefined({
-          title: String(data.title ?? existing.title).trim(),
-          level,
-          parent,
-          owner: String(data.owner ?? existing.owner).trim(),
-          year: String(data.year ?? existing.year).trim(),
+          title: (String(data.title ?? existing.title).trim() || existing.title).slice(0, 200),
+          level: level.slice(0, 120),
+          parent: parent.slice(0, 128),
+          owner: (String(data.owner ?? existing.owner).trim() || existing.owner).slice(0, 120),
+          year: (String(data.year ?? existing.year).trim() || existing.year).slice(0, 40),
           kpi: kpiId,
           baseline: Number.isFinite(baselineNum) ? baselineNum : 0,
           target: Number.isFinite(targetNum) ? targetNum : 0,
-          unit: String(data.unit ?? existing.unit ?? '%'),
+          unit: String(data.unit ?? existing.unit ?? '%').slice(0, 40),
           status: data.status ?? existing.status,
           approval: nextApproval,
           performance: perfLabel,
           iso: isoStr,
-          description: String(data.description ?? existing.description ?? ''),
-          planWhat: String(data.planWhat ?? existing.planWhat ?? ''),
-          resources: String(data.resources ?? existing.resources ?? ''),
-          planDue: String(data.planDue ?? existing.planDue ?? ''),
-          evaluation: String(data.evaluation ?? existing.evaluation ?? ''),
+          description: String(data.description ?? existing.description ?? '').slice(0, 2000),
+          planWhat: String(data.planWhat ?? existing.planWhat ?? '').slice(0, 1000),
+          resources: String(data.resources ?? existing.resources ?? '').slice(0, 1000),
+          planDue: String(data.planDue ?? existing.planDue ?? '').slice(0, 40),
+          evaluation: String(data.evaluation ?? existing.evaluation ?? '').slice(0, 1000),
           isoRefs,
-          riskRefs: String(data.riskRefs ?? existing.riskRefs ?? ''),
-          processRefs: String(data.processRefs ?? existing.processRefs ?? ''),
-          evidenceRefs: String(data.evidenceRefs ?? existing.evidenceRefs ?? ''),
+          riskRefs: String(data.riskRefs ?? existing.riskRefs ?? '').slice(0, 240),
+          processRefs: String(data.processRefs ?? existing.processRefs ?? '').slice(0, 240),
+          evidenceRefs: String(data.evidenceRefs ?? existing.evidenceRefs ?? '').slice(0, 240),
           revision: nextRev,
           updatedAt: serverTimestamp(),
         });
@@ -1089,28 +1108,28 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const newGoal: Omit<StrategicGoal, 'createdAt' | 'updatedAt'> = stripUndefined({
           ...baseFields(),
           id: goalId,
-          title: String(data.title || '').trim(),
-          level,
-          parent,
-          owner: String(data.owner || 'Site Manager').trim(),
-          year: String(data.year || year),
+          title: (String(data.title || '').trim() || 'Untitled Goal').slice(0, 200),
+          level: level.slice(0, 120),
+          parent: parent.slice(0, 128),
+          owner: (String(data.owner || 'Site Manager').trim() || 'Site Manager').slice(0, 120),
+          year: (String(data.year || year).trim() || year).slice(0, 40),
           kpi: kpiId,
           baseline: Number.isFinite(baselineNum) ? baselineNum : 0,
           target: Number.isFinite(targetNum) ? targetNum : 0,
-          unit: String(data.unit || '%'),
+          unit: String(data.unit || '%').slice(0, 40),
           status: (data.status as StrategicGoal['status']) || 'Planned',
           approval: 'Draft',
           performance: perfLabel,
           iso: isoStr,
-          description: String(data.description || ''),
-          planWhat: String(data.planWhat || ''),
-          resources: String(data.resources || ''),
-          planDue: String(data.planDue || '2027-12-31'),
-          evaluation: String(data.evaluation || ''),
+          description: String(data.description || '').slice(0, 2000),
+          planWhat: String(data.planWhat || '').slice(0, 1000),
+          resources: String(data.resources || '').slice(0, 1000),
+          planDue: String(data.planDue || '2027-12-31').slice(0, 40),
+          evaluation: String(data.evaluation || '').slice(0, 1000),
           isoRefs,
-          riskRefs: String(data.riskRefs || ''),
-          processRefs: String(data.processRefs || ''),
-          evidenceRefs: String(data.evidenceRefs || ''),
+          riskRefs: String(data.riskRefs || '').slice(0, 240),
+          processRefs: String(data.processRefs || '').slice(0, 240),
+          evidenceRefs: String(data.evidenceRefs || '').slice(0, 240),
           revision: 1,
         });
 
@@ -1135,10 +1154,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         toast('Goal saved — ISO references, KPI target & hierarchy synced', 'success');
         return goalId;
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/goals/${goalId}`);
+        return failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/goals/${goalId}`, 'Could not save goal');
       }
     },
-    [activeWorkspaceId, goals, initiatives, activeRole, isoStandards, kpis, baseFields, today, addHistoryEntry, approvals, year, toast]
+    [activeWorkspaceId, goals, initiatives, activeRole, isoStandards, kpis, baseFields, today, addHistoryEntry, approvals, year, toast, failMutation]
   );
 
   const decideCatchballApproval = useCallback(
@@ -1185,7 +1204,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       };
 
       if (decision === 'Approved') {
-        const revId = `ACT-REV-${Date.now().toString(36)}`;
+        const revId = `ACT-REV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
         batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', revId), {
           ...baseFields(),
           id: revId,
@@ -1197,11 +1216,17 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         const nextTarget = Number(c.proposal.target);
         const kObj = kpiById(kpis, g.kpi);
-        const updatedGoal = { ...g, target: nextTarget, resources: c.proposal.resources, approval: 'Approved' as const, revision: (g.revision || 1) + 1 };
+        const updatedGoal = {
+          ...g,
+          target: Number.isFinite(nextTarget) ? nextTarget : g.target,
+          resources: String(c.proposal.resources || '').slice(0, 1000),
+          approval: 'Approved' as const,
+          revision: Math.min(999, (g.revision || 1) + 1),
+        };
 
         batch.update(doc(db, 'workspaces', activeWorkspaceId, 'goals', g.id), {
-          target: nextTarget,
-          resources: c.proposal.resources,
+          target: updatedGoal.target,
+          resources: updatedGoal.resources,
           approval: 'Approved',
           revision: updatedGoal.revision,
           updatedAt: serverTimestamp(),
@@ -1219,13 +1244,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         batch.update(doc(db, 'workspaces', activeWorkspaceId, 'catchballs', c.id), {
           status: 'Approved',
-          messages: [...c.messages, nextMsg],
+          messages: [...c.messages, nextMsg].slice(-50),
           updatedDate: today,
           updatedAt: serverTimestamp(),
         });
 
         // Director log
-        const dlId = `ACT-DL-${Date.now().toString(36)}`;
+        const dlId = `ACT-DL-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
         batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', dlId), {
           ...baseFields(),
           id: dlId,
@@ -1246,7 +1271,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           updatedAt: serverTimestamp(),
         });
         if (activeRole !== 'General director') {
-          const dnId = `ACT-DN-${Date.now().toString(36)}`;
+          const dnId = `ACT-DN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
           batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', dnId), {
             ...baseFields(),
             id: dnId,
@@ -1265,7 +1290,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         batch.update(doc(db, 'workspaces', activeWorkspaceId, 'catchballs', c.id), {
           status: 'Changes requested',
           turn: leadershipRole(c.origin) ? c.origin : 'Department director',
-          messages: [...c.messages, nextMsg],
+          messages: [...c.messages, nextMsg].slice(-50),
           updatedDate: today,
           updatedAt: serverTimestamp(),
         });
@@ -1273,13 +1298,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       batch.update(doc(db, 'workspaces', activeWorkspaceId, 'approvals', a.id), {
         status: decision,
-        comment: String(note || ''),
+        comment: String(note || '').slice(0, 1000),
         resolvedAt: today,
         approvedBy: activeRole,
         updatedAt: serverTimestamp(),
       });
 
-      const notifId = `ACT-CBN-${Date.now().toString(36)}`;
+      const notifId = `ACT-CBN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
       batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', notifId), {
         ...baseFields(),
         id: notifId,
@@ -1302,10 +1327,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast(decision === 'Approved' ? 'Goal formally approved' : 'Changes requested', 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/approvals/${a.id}`);
+        failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/approvals/${a.id}`, 'Could not save formal decision');
       }
     },
-    [activeWorkspaceId, approvals, catchballs, goals, activeRole, kpis, showModal, today, baseFields, isoStandards, addHistoryEntry, toast]
+    [activeWorkspaceId, approvals, catchballs, goals, activeRole, kpis, showModal, today, baseFields, isoStandards, addHistoryEntry, toast, failMutation]
   );
 
   const submitCatchballForApproval = useCallback(
@@ -1343,10 +1368,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         requester: activeRole,
         approver: 'General director / QMS auditor',
         status: 'Pending',
-        comment: `Catchball aligned. ISO planning complete. Proposed target ${c.proposal.target}`,
+        comment: `Catchball aligned. ISO planning complete. Proposed target ${c.proposal.target}`.slice(0, 1000),
         date: today,
         proposedTarget: Number(c.proposal.target),
-        proposedResources: String(c.proposal.resources || ''),
+        proposedResources: String(c.proposal.resources || '').slice(0, 1000),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -1363,12 +1388,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       };
       batch.update(doc(db, 'workspaces', activeWorkspaceId, 'catchballs', c.id), {
         status: 'Pending approval',
-        messages: [...c.messages, nextMsg],
+        messages: [...c.messages, nextMsg].slice(-50),
         updatedDate: today,
         updatedAt: serverTimestamp(),
       });
       for (const rec of ['General director', 'QMS auditor']) {
-        const nid = `ACT-CBN-${Date.now().toString(36)}-${rec.slice(0, 2)}`;
+        const nid = `ACT-CBN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}-${rec.slice(0, 2)}`;
         batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', nid), {
           ...baseFields(),
           id: nid,
@@ -1384,10 +1409,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast('Submitted for formal approval', 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/catchballs/${c.id}`);
+        failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/catchballs/${c.id}`, 'Could not submit Catchball for approval');
       }
     },
-    [activeWorkspaceId, catchballs, activeRole, goals, initiatives, kpis, showModal, approvals, baseFields, today, addHistoryEntry, toast]
+    [activeWorkspaceId, catchballs, activeRole, goals, initiatives, kpis, showModal, approvals, baseFields, today, addHistoryEntry, toast, failMutation]
   );
 
   const submitGoal = useCallback(
@@ -1498,7 +1523,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const batch = writeBatch(db);
       batch.update(doc(db, 'workspaces', activeWorkspaceId, 'approvals', a.id), {
         status,
-        comment: String(comment || ''),
+        comment: String(comment || '').slice(0, 1000),
         resolvedAt: today,
         approvedBy: activeRole,
         updatedAt: serverTimestamp(),
@@ -1508,7 +1533,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         updatedAt: serverTimestamp(),
       });
       if (status === 'Approved') {
-        const dlId = `ACT-DL-${Date.now().toString(36)}`;
+        const dlId = `ACT-DL-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
         batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', dlId), {
           ...baseFields(),
           id: dlId,
@@ -1528,7 +1553,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           updatedAt: serverTimestamp(),
         });
         if (activeRole !== 'General director') {
-          const dnId = `ACT-DN-${Date.now().toString(36)}`;
+          const dnId = `ACT-DN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
           batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', dnId), {
             ...baseFields(),
             id: dnId,
@@ -1545,10 +1570,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast(`${g.id} ${status}`, 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/approvals/${a.id}`);
+        failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/approvals/${a.id}`, 'Could not save formal decision');
       }
     },
-    [activeWorkspaceId, approvals, decideCatchballApproval, goals, activeRole, initiatives, kpis, showModal, today, baseFields, isoStandards, addHistoryEntry, toast]
+    [activeWorkspaceId, approvals, decideCatchballApproval, goals, activeRole, initiatives, kpis, showModal, today, baseFields, isoStandards, addHistoryEntry, toast, failMutation]
   );
 
   const revisePlan = useCallback(
@@ -1679,7 +1704,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       }
 
-      const csvActId = `ACT-CSV-${Date.now().toString(36)}`;
+      const csvActId = `ACT-CSV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
       batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', csvActId), {
         ...baseFields(),
         id: csvActId,
@@ -1695,10 +1720,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         toast('KPI values imported & goals recalculated', 'success');
         return true;
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/kpis`);
+        return failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/kpis`, 'Could not import KPI CSV');
       }
     },
-    [activeWorkspaceId, activeRole, kpis, goals, initiatives, today, baseFields, addHistoryEntry, toast]
+    [activeWorkspaceId, activeRole, kpis, goals, initiatives, today, baseFields, addHistoryEntry, toast, failMutation]
   );
 
   const cycleMatrixRelation = useCallback(
@@ -1851,9 +1876,19 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const id = nextCode(initiatives.map((i) => i.id), 'I');
       const relId = toValidDocId(`${data.goal}__${id}`);
       const batch = writeBatch(db);
+      const sanitizedData = stripUndefined({
+        ...data,
+        title: (String(data.title || '').trim() || 'Untitled Initiative').slice(0, 200),
+        owner: (String(data.owner || '').trim() || 'Owner').slice(0, 120),
+        budget: String(data.budget || '').slice(0, 80),
+        description: String(data.description || '').slice(0, 2000),
+        valueStream: String(data.valueStream || '').slice(0, 240),
+        progress: Math.max(0, Math.min(100, Math.round(Number(data.progress || 0)))),
+        isBottleneck: Boolean(data.isBottleneck),
+      });
       batch.set(doc(db, 'workspaces', activeWorkspaceId, 'initiatives', id), {
         ...baseFields(),
-        ...stripUndefined(data),
+        ...sanitizedData,
         id,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -1873,10 +1908,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         toast(`Initiative ${id} created`, 'success');
         return id;
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/initiatives/${id}`);
+        return failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/initiatives/${id}`, 'Could not create initiative');
       }
     },
-    [activeWorkspaceId, activeRole, goals, initiatives, baseFields, toast]
+    [activeWorkspaceId, activeRole, goals, initiatives, baseFields, toast, failMutation]
   );
 
   const updateInitiativeFocus = useCallback(
@@ -1894,17 +1929,17 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await updateDoc(doc(db, 'workspaces', activeWorkspaceId, 'initiatives', id), {
           progress: Math.max(0, Math.min(100, Math.round(Number(patch.progress || 0)))),
           status: patch.status,
-          valueStream: patch.valueStream || '',
+          valueStream: String(patch.valueStream || '').slice(0, 240),
           isBottleneck: Boolean(patch.isBottleneck),
           sqdc: patch.sqdc,
           updatedAt: serverTimestamp(),
         });
         toast('Initiative execution & SQDC updated', 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/initiatives/${id}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/initiatives/${id}`, 'Could not update initiative');
       }
     },
-    [activeWorkspaceId, initiatives, activeRole, goals, toast]
+    [activeWorkspaceId, initiatives, activeRole, goals, toast, failMutation]
   );
 
   const saveProjectA3 = useCallback(
@@ -2015,9 +2050,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         ...baseFields(),
         id,
         project: projectId,
-        title: title.trim(),
-        owner: (owner || 'Project Leader').trim(),
-        due: providedDue || today,
+        title: title.trim().slice(0, 240),
+        owner: (owner || 'Project Leader').trim().slice(0, 120) || 'Project Leader',
+        due: (providedDue || today).slice(0, 40),
         status: 'Open',
       };
       const batch = writeBatch(db);
@@ -2031,10 +2066,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast('Activity added & progress synced', 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/tasks/${id}`);
+        failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/tasks/${id}`, 'Could not add activity');
       }
     },
-    [activeWorkspaceId, projects, activeRole, goals, initiatives, showModal, tasks, baseFields, today, syncProjectAndInitiativeBatch, toast]
+    [activeWorkspaceId, projects, activeRole, goals, initiatives, showModal, tasks, baseFields, today, syncProjectAndInitiativeBatch, toast, failMutation]
   );
 
   const toggleTaskStatus = useCallback(
@@ -2066,10 +2101,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast(`Task ${t.id} → ${nextStatus}`, 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/tasks/${t.id}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/tasks/${t.id}`, 'Could not update task status');
       }
     },
-    [activeWorkspaceId, tasks, projects, activeRole, goals, initiatives, syncProjectAndInitiativeBatch, toast]
+    [activeWorkspaceId, tasks, projects, activeRole, goals, initiatives, syncProjectAndInitiativeBatch, toast, failMutation]
   );
 
   const createPulseCard = useCallback(
@@ -2078,13 +2113,14 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         toast('Read-only role cannot add pulse cards', 'error');
         return;
       }
-      const cleanTitle = input.title.trim();
+      const cleanTitle = input.title.trim().slice(0, 240);
       if (!cleanTitle) return;
       const id = nextCode(pulseCards.map((c) => c.id), 'PC');
-      const linkedKpiId = input.kpi || '';
+      const linkedKpiId = (input.kpi || '').slice(0, 128);
       const matchedGoal = linkedKpiId ? goals.find((g) => g.kpi === linkedKpiId && visibleToRole(g, activeRole)) : undefined;
       const matchedInit = matchedGoal ? initiatives.find((i) => initiativeLinkedToGoal(i, matchedGoal.id, relations)) : undefined;
       const matchedProj = matchedInit ? projects.find((p) => p.initiative === matchedInit.id) : undefined;
+      const cleanOwner = (input.owner || activeRole).trim().slice(0, 120) || activeRole;
 
       let blockerId = '';
       let status: PulseCard['status'] = 'Team action';
@@ -2099,12 +2135,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           id: blockerId,
           targetType,
           targetId,
-          scope,
+          scope: scope.slice(0, 120),
           category: 'Technical',
           severity: 'High',
-          summary: cleanTitle,
+          summary: cleanTitle.slice(0, 1000),
           neededAction: 'Review escalated Tier 1 daily board issue in Tier 2 / PDCA meeting.',
-          owner: input.owner || activeRole,
+          owner: cleanOwner,
           raisedBy: activeRole,
           raisedAt: today,
           status: 'Open',
@@ -2119,11 +2155,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         ...baseFields(),
         id,
         title: cleanTitle,
-        details: (input.details || '').trim(),
-        due: input.due || '',
-        scope,
+        details: (input.details || '').trim().slice(0, 3000),
+        due: (input.due || '').slice(0, 40),
+        scope: scope.slice(0, 120),
         routeType: input.routeType,
-        owner: input.owner || activeRole,
+        owner: cleanOwner,
         kpi: linkedKpiId,
         initiative: matchedInit?.id || '',
         project: matchedProj?.id || '',
@@ -2139,10 +2175,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast(blockerId ? `Added ${id} and escalated ${blockerId}` : `Added ${id} to Daily Board`, 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/pulseCards/${id}`);
+        failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/pulseCards/${id}`, 'Could not add Daily Board card');
       }
     },
-    [activeWorkspaceId, activeRole, pulseCards, goals, initiatives, relations, projects, blockers, baseFields, scope, today, toast]
+    [activeWorkspaceId, activeRole, pulseCards, goals, initiatives, relations, projects, blockers, baseFields, scope, today, toast, failMutation]
   );
 
   const savePulseCardDetails = useCallback(
@@ -2153,16 +2189,17 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (!activeWorkspaceId || activeRole === 'Auditor') return;
       const c = pulseCards.find((x) => x.id === cardId);
       if (!c) return;
-      const linkedKpiId = patch.kpi || '';
+      const linkedKpiId = (patch.kpi || '').slice(0, 128);
       const matchedGoal = linkedKpiId ? goals.find((g) => g.kpi === linkedKpiId && visibleToRole(g, activeRole)) : undefined;
       const matchedInit = matchedGoal ? initiatives.find((i) => initiativeLinkedToGoal(i, matchedGoal.id, relations)) : undefined;
       const matchedProj = matchedInit ? projects.find((p) => p.initiative === matchedInit.id) : undefined;
+      const cleanTitle = (patch.title.trim() || c.title).slice(0, 240);
 
       const batch = writeBatch(db);
       batch.update(doc(db, 'workspaces', activeWorkspaceId, 'pulseCards', cardId), {
-        title: patch.title.trim() || c.title,
-        details: patch.details.trim(),
-        due: patch.due || '',
+        title: cleanTitle,
+        details: patch.details.trim().slice(0, 3000),
+        due: (patch.due || '').slice(0, 40),
         routeType: patch.routeType,
         kpi: linkedKpiId,
         initiative: matchedInit?.id || (!linkedKpiId ? '' : c.initiative || ''),
@@ -2176,7 +2213,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const nextTargetId = matchedInit?.id || linkedKpiId || matchedGoal?.id || b.targetId;
           const nextTargetType = matchedInit ? 'initiative' : linkedKpiId ? 'kpi' : 'goal';
           batch.update(doc(db, 'workspaces', activeWorkspaceId, 'blockers', b.id), {
-            summary: patch.title.trim() || c.title,
+            summary: cleanTitle.slice(0, 1000),
             targetType: nextTargetType,
             targetId: nextTargetId,
             updatedAt: serverTimestamp(),
@@ -2188,10 +2225,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast(`Saved ${c.id} details`, 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/pulseCards/${cardId}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/pulseCards/${cardId}`, 'Could not save card details');
       }
     },
-    [activeWorkspaceId, activeRole, pulseCards, goals, initiatives, relations, projects, blockers, toast]
+    [activeWorkspaceId, activeRole, pulseCards, goals, initiatives, relations, projects, blockers, toast, failMutation]
   );
 
   const togglePulseCardDone = useCallback(
@@ -2201,7 +2238,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (!c) return;
       const nextDone = c.status !== 'Done';
       const nextStatus: PulseCard['status'] = nextDone ? 'Done' : c.blockerId ? (c.delegatedBy ? 'Team action' : 'Escalated') : 'Team action';
-      const nextComments = [...(c.comments || []), { by: activeRole, at: today, text: nextDone ? '✓ Marked Done' : 'Reopened card' }];
+      const nextComments = [...(c.comments || []), { by: activeRole, at: today, text: nextDone ? '✓ Marked Done' : 'Reopened card' }].slice(-50);
 
       const batch = writeBatch(db);
       batch.update(doc(db, 'workspaces', activeWorkspaceId, 'pulseCards', c.id), {
@@ -2216,7 +2253,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           batch.update(doc(db, 'workspaces', activeWorkspaceId, 'blockers', b.id), {
             status: nextDone ? 'Resolved' : b.reviewId ? 'In review' : 'Open',
             resolvedAt: nextDone ? today : '',
-            resolutionNote: nextDone ? b.resolutionNote || `Closed via Daily Board (${c.id})` : b.resolutionNote || '',
+            resolutionNote: nextDone ? (b.resolutionNote || `Closed via Daily Board (${c.id})`).slice(0, 1000) : (b.resolutionNote || '').slice(0, 1000),
             updatedAt: serverTimestamp(),
           });
           if (b.reviewId && typeof b.decisionIndex === 'number') {
@@ -2238,10 +2275,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast(nextDone ? `${c.id} completed` : `${c.id} reopened`, 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/pulseCards/${c.id}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/pulseCards/${c.id}`, 'Could not update card status');
       }
     },
-    [activeWorkspaceId, activeRole, pulseCards, today, blockers, reviews, toast]
+    [activeWorkspaceId, activeRole, pulseCards, today, blockers, reviews, toast, failMutation]
   );
 
   const escalatePulseCard = useCallback(
@@ -2262,12 +2299,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           id: blockerId,
           targetType,
           targetId,
-          scope: c.scope,
+          scope: c.scope.slice(0, 120),
           category: 'Cross-functional',
           severity: 'High',
-          summary: c.title,
+          summary: c.title.slice(0, 1000),
           neededAction: 'Escalated from Daily Tier 1 Pulse Board for Tier 2/3 leadership support.',
-          owner: c.owner || activeRole,
+          owner: (c.owner || activeRole).slice(0, 120),
           raisedBy: activeRole,
           raisedAt: today,
           status: 'Open',
@@ -2305,7 +2342,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         status: 'Escalated',
         routeType: 'Escalate',
         blockerId,
-        comments: nextComments,
+        comments: nextComments.slice(-50),
         updatedAt: serverTimestamp(),
       });
 
@@ -2313,10 +2350,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast(`Escalated ${c.id} as ${blockerId}`, 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/pulseCards/${c.id}`);
+        failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/pulseCards/${c.id}`, 'Could not escalate card');
       }
     },
-    [activeWorkspaceId, activeRole, pulseCards, blockers, goals, baseFields, today, addHistoryEntry, reviews, toast]
+    [activeWorkspaceId, activeRole, pulseCards, blockers, goals, baseFields, today, addHistoryEntry, reviews, toast, failMutation]
   );
 
   const movePulseCardStatus = useCallback(
@@ -2335,15 +2372,15 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       try {
         await updateDoc(doc(db, 'workspaces', activeWorkspaceId, 'pulseCards', c.id), {
           status: nextStatus,
-          comments: [...(c.comments || []), { by: activeRole, at: today, text: `Moved to ${nextStatus}` }],
+          comments: [...(c.comments || []), { by: activeRole, at: today, text: `Moved to ${nextStatus}` }].slice(-50),
           updatedAt: serverTimestamp(),
         });
         toast(`${c.id} moved to ${nextStatus}`, 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/pulseCards/${c.id}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/pulseCards/${c.id}`, 'Could not move card');
       }
     },
-    [activeWorkspaceId, activeRole, pulseCards, escalatePulseCard, togglePulseCardDone, today, toast]
+    [activeWorkspaceId, activeRole, pulseCards, escalatePulseCard, togglePulseCardDone, today, toast, failMutation]
   );
 
   const delegatePulseCard = useCallback(
@@ -2351,15 +2388,17 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (!activeWorkspaceId || activeRole === 'Auditor') return;
       const c = pulseCards.find((x) => x.id === cardId);
       if (!c) return;
-      const cleanNote = note.trim();
+      const cleanNote = note.trim().slice(0, 500);
+      const cleanOwner = (targetOwner.trim() || c.owner).slice(0, 120);
+      const cleanScope = targetScope.slice(0, 120);
       const nextComments = [
         ...(c.comments || []),
-        { by: activeRole, at: today, text: `↳ Delegated to ${targetOwner} (${targetScope})${cleanNote ? ': ' + cleanNote : ''}` },
-      ];
+        { by: activeRole, at: today, text: `↳ Delegated to ${cleanOwner} (${cleanScope})${cleanNote ? ': ' + cleanNote : ''}` },
+      ].slice(-50);
       const batch = writeBatch(db);
       batch.update(doc(db, 'workspaces', activeWorkspaceId, 'pulseCards', c.id), {
-        scope: targetScope,
-        owner: targetOwner.trim() || c.owner,
+        scope: cleanScope,
+        owner: cleanOwner,
         status: 'Team action',
         delegatedBy: activeRole,
         delegatedAt: today,
@@ -2371,24 +2410,27 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const b = blockers.find((x) => x.id === c.blockerId);
         if (b) {
           batch.update(doc(db, 'workspaces', activeWorkspaceId, 'blockers', b.id), {
-            scope: targetScope,
-            owner: targetOwner.trim() || b.owner,
+            scope: cleanScope,
+            owner: cleanOwner,
             status: 'In review',
             resolvedAt: '',
-            neededAction: cleanNote ? `Delegated by ${activeRole} to ${targetOwner} (${targetScope}): ${cleanNote}` : `Delegated by ${activeRole} to ${targetOwner} (${targetScope})`,
+            neededAction: (cleanNote
+              ? `Delegated by ${activeRole} to ${cleanOwner} (${cleanScope}): ${cleanNote}`
+              : `Delegated by ${activeRole} to ${cleanOwner} (${cleanScope})`
+            ).slice(0, 1000),
             updatedAt: serverTimestamp(),
           });
         }
       }
-      addHistoryEntry(batch, `${c.id} delegated by ${activeRole} to ${targetOwner} (${targetScope})`);
+      addHistoryEntry(batch, `${c.id} delegated by ${activeRole} to ${cleanOwner} (${cleanScope})`);
       try {
         await batch.commit();
-        toast(`Delegated ${c.id} to ${targetOwner}`, 'success');
+        toast(`Delegated ${c.id} to ${cleanOwner}`, 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/pulseCards/${c.id}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/pulseCards/${c.id}`, 'Could not delegate card');
       }
     },
-    [activeWorkspaceId, activeRole, pulseCards, today, blockers, addHistoryEntry, toast]
+    [activeWorkspaceId, activeRole, pulseCards, today, blockers, addHistoryEntry, toast, failMutation]
   );
 
   const addPulseCardComment = useCallback(
@@ -2398,15 +2440,15 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (!c || !text.trim()) return;
       try {
         await updateDoc(doc(db, 'workspaces', activeWorkspaceId, 'pulseCards', c.id), {
-          comments: [...(c.comments || []), { by: activeRole, at: today, text: text.trim() }],
+          comments: [...(c.comments || []), { by: activeRole, at: today, text: text.trim().slice(0, 500) }].slice(-50),
           updatedAt: serverTimestamp(),
         });
         toast('Stand-up note added', 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/pulseCards/${c.id}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/pulseCards/${c.id}`, 'Could not add stand-up note');
       }
     },
-    [activeWorkspaceId, activeRole, pulseCards, today, toast]
+    [activeWorkspaceId, activeRole, pulseCards, today, toast, failMutation]
   );
 
   const toggleSafetyDay = useCallback(
@@ -2465,12 +2507,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         id,
         targetType,
         targetId,
-        scope: info.scope,
-        category: res.category,
+        scope: info.scope.slice(0, 120),
+        category: res.category.slice(0, 80),
         severity: res.severity,
-        summary: res.summary,
-        neededAction: res.neededAction,
-        owner: info.owner,
+        summary: res.summary.trim().slice(0, 1000) || 'Escalated blocker',
+        neededAction: res.neededAction.trim().slice(0, 1000) || 'Action required',
+        owner: info.owner.slice(0, 120),
         raisedBy: activeRole,
         raisedAt: today,
         status: 'Open',
@@ -2483,10 +2525,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast(`${id} escalated to PDCA Review queue`, 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/blockers/${id}`);
+        failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/blockers/${id}`, 'Could not escalate blocker');
       }
     },
-    [activeWorkspaceId, goals, kpis, initiatives, projects, showModal, blockers, baseFields, activeRole, today, addHistoryEntry, toast]
+    [activeWorkspaceId, goals, kpis, initiatives, projects, showModal, blockers, baseFields, activeRole, today, addHistoryEntry, toast, failMutation]
   );
 
   const resolveBlocker = useCallback(
@@ -2506,12 +2548,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         required: true,
       });
       if (!note) return;
+      const cleanNote = String(note).trim().slice(0, 1000);
 
       const batch = writeBatch(db);
       batch.update(doc(db, 'workspaces', activeWorkspaceId, 'blockers', b.id), {
         status: 'Resolved',
         resolvedAt: today,
-        resolutionNote: String(note).trim(),
+        resolutionNote: cleanNote,
         updatedAt: serverTimestamp(),
       });
       if (b.reviewId && typeof b.decisionIndex === 'number') {
@@ -2527,19 +2570,19 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       for (const pc of pulseCards.filter((c) => c.blockerId === b.id && c.status !== 'Done')) {
         batch.update(doc(db, 'workspaces', activeWorkspaceId, 'pulseCards', pc.id), {
           status: 'Done',
-          comments: [...(pc.comments || []), { by: 'PDCA / Blocker Sync', at: today, text: `✓ Closed via Blocker ${b.id}: ${String(note).trim()}` }],
+          comments: [...(pc.comments || []), { by: 'PDCA / Blocker Sync', at: today, text: `✓ Closed via Blocker ${b.id}: ${cleanNote}` }].slice(-50),
           updatedAt: serverTimestamp(),
         });
       }
-      addHistoryEntry(batch, `${b.id} resolved: ${String(note).trim()}`);
+      addHistoryEntry(batch, `${b.id} resolved: ${cleanNote}`);
       try {
         await batch.commit();
         toast(`${b.id} marked resolved`, 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/blockers/${b.id}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/blockers/${b.id}`, 'Could not resolve blocker');
       }
     },
-    [activeWorkspaceId, activeRole, goals, initiatives, blockers, showModal, today, reviews, pulseCards, addHistoryEntry, toast]
+    [activeWorkspaceId, activeRole, goals, initiatives, blockers, showModal, today, reviews, pulseCards, addHistoryEntry, toast, failMutation]
   );
 
   const reopenBlocker = useCallback(
@@ -2568,10 +2611,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast(`${b.id} reopened`, 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/blockers/${b.id}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/blockers/${b.id}`, 'Could not reopen blocker');
       }
     },
-    [activeWorkspaceId, activeRole, goals, initiatives, blockers, reviews, toast]
+    [activeWorkspaceId, activeRole, goals, initiatives, blockers, reviews, toast, failMutation]
   );
 
   const convertToPdcaDecision = useCallback(
@@ -2606,11 +2649,15 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const batch = writeBatch(db);
       let rev = reviews.find((x) => x.id === res.reviewId);
+      if (rev && rev.decisions.length >= 50) {
+        toast('Selected review has reached the maximum of 50 decisions; choose "+ New Review"', 'error');
+        return null;
+      }
       let targetRevId = rev?.id;
       const newDecision = {
-        text: res.text,
-        owner: res.owner,
-        due: res.due,
+        text: String(res.text || '').trim().slice(0, 500),
+        owner: String(res.owner || '').trim().slice(0, 120),
+        due: String(res.due || today).slice(0, 40),
         status: 'Open' as const,
         ...(blockerId ? { blockerId } : {}),
         linkedType: targetType,
@@ -2624,9 +2671,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         batch.set(doc(db, 'workspaces', activeWorkspaceId, 'reviews', targetRevId), {
           ...baseFields(),
           id: targetRevId,
-          title: `PDCA Review · ${scope}`,
+          title: `PDCA Review · ${scope}`.slice(0, 200),
           date: today,
-          scope: info.scope || scope,
+          scope: (info.scope || scope).slice(0, 120),
           notes: 'Created from Escalated Blocker & Exception Queue.',
           decisions: [newDecision],
           createdAt: serverTimestamp(),
@@ -2655,10 +2702,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         toast(`Decision added to ${targetRevId}`, 'success');
         return targetRevId || null;
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/reviews`);
+        return failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/reviews`, 'Could not log PDCA decision');
       }
     },
-    [activeWorkspaceId, activeRole, goals, initiatives, blockers, kpis, projects, reviews, showModal, baseFields, scope, today, addHistoryEntry, toast]
+    [activeWorkspaceId, activeRole, goals, initiatives, blockers, kpis, projects, reviews, showModal, baseFields, scope, today, addHistoryEntry, toast, failMutation]
   );
 
   const createReview = useCallback(
@@ -2668,15 +2715,17 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         toast('Your role cannot create PDCA reviews', 'error');
         return null;
       }
+      const cleanTitle = input.title.trim().slice(0, 200);
+      if (!cleanTitle) return null;
       const id = nextCode(reviews.map((r) => r.id), 'R');
       try {
         await setDoc(doc(db, 'workspaces', activeWorkspaceId, 'reviews', id), {
           ...baseFields(),
           id,
-          title: input.title.trim(),
-          date: input.date || today,
-          scope: input.scope || scope,
-          notes: input.notes || '',
+          title: cleanTitle,
+          date: (input.date || today).slice(0, 40),
+          scope: (input.scope || scope).slice(0, 120),
+          notes: (input.notes || '').slice(0, 4000),
           decisions: [],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -2684,10 +2733,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         toast(`Review ${id} created`, 'success');
         return id;
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/reviews/${id}`);
+        return failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/reviews/${id}`, 'Could not create PDCA review');
       }
     },
-    [activeWorkspaceId, activeRole, goals, initiatives, reviews, baseFields, today, scope, toast]
+    [activeWorkspaceId, activeRole, goals, initiatives, reviews, baseFields, today, scope, toast, failMutation]
   );
 
   const toggleDecision = useCallback(
@@ -2711,7 +2760,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           batch.update(doc(db, 'workspaces', activeWorkspaceId, 'blockers', b.id), {
             status: nextStatus === 'Done' ? 'Resolved' : 'In review',
             resolvedAt: nextStatus === 'Done' ? today : '',
-            resolutionNote: nextStatus === 'Done' ? b.resolutionNote || `Closed via PDCA decision in ${rev.id}` : b.resolutionNote || '',
+            resolutionNote: nextStatus === 'Done' ? (b.resolutionNote || `Closed via PDCA decision in ${rev.id}`).slice(0, 1000) : (b.resolutionNote || '').slice(0, 1000),
             updatedAt: serverTimestamp(),
           });
           if (nextStatus === 'Done') {
@@ -2719,7 +2768,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             for (const pc of pulseCards.filter((c) => c.blockerId === b.id && c.status !== 'Done')) {
               batch.update(doc(db, 'workspaces', activeWorkspaceId, 'pulseCards', pc.id), {
                 status: 'Done',
-                comments: [...(pc.comments || []), { by: 'PDCA / Blocker Sync', at: today, text: `✓ Closed via PDCA decision in ${rev.id}` }],
+                comments: [...(pc.comments || []), { by: 'PDCA / Blocker Sync', at: today, text: `✓ Closed via PDCA decision in ${rev.id}` }].slice(-50),
                 updatedAt: serverTimestamp(),
               });
             }
@@ -2730,10 +2779,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast(dec.blockerId && nextStatus === 'Done' ? `Decision done — blocker ${dec.blockerId} auto-resolved` : `Decision → ${nextStatus}`, 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/reviews/${reviewId}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/reviews/${reviewId}`, 'Could not update decision');
       }
     },
-    [activeWorkspaceId, activeRole, goals, initiatives, reviews, blockers, today, addHistoryEntry, pulseCards, toast]
+    [activeWorkspaceId, activeRole, goals, initiatives, reviews, blockers, today, addHistoryEntry, pulseCards, toast, failMutation]
   );
 
   const addDecision = useCallback(
@@ -2742,17 +2791,29 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (!roleCan(activeRole, 'reviewWrite', null, { goals, initiatives })) return;
       const rev = reviews.find((r) => r.id === reviewId);
       if (!rev) return;
+      if (rev.decisions.length >= 50) {
+        toast('Review has reached the maximum of 50 decisions', 'error');
+        return;
+      }
       try {
         await updateDoc(doc(db, 'workspaces', activeWorkspaceId, 'reviews', rev.id), {
-          decisions: [...rev.decisions, { ...decision, status: 'Open' }],
+          decisions: [
+            ...rev.decisions,
+            {
+              text: decision.text.trim().slice(0, 500),
+              owner: decision.owner.trim().slice(0, 120),
+              due: decision.due.slice(0, 40),
+              status: 'Open',
+            },
+          ],
           updatedAt: serverTimestamp(),
         });
         toast('PDCA action added', 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/reviews/${reviewId}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/reviews/${reviewId}`, 'Could not add decision');
       }
     },
-    [activeWorkspaceId, activeRole, goals, initiatives, reviews, toast]
+    [activeWorkspaceId, activeRole, goals, initiatives, reviews, toast, failMutation]
   );
 
   const prepareManagementReview = useCallback(async (): Promise<string | null> => {
@@ -2764,7 +2825,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const m = managementSummary(domainSnapshot);
     const id = nextCode(reviews.map((r) => r.id), 'R');
     const blockerLines = m.blockers.map((b) => `- ${b.id} [${b.severity}/${b.category}]: ${b.summary} (Need: ${b.neededAction})`).join('\n');
-    const notes = `SafeQMS Goal Management automated input (${today}):\nGoals on track: ${m.on.length}; at risk: ${m.risk.length}; off track: ${m.off.length}; not measured: ${m.notMeasured.length}.\nEscalated blockers (${m.blockers.length}):\n${blockerLines || 'none'}\nGoals with incomplete plans: ${m.gaps.map((g) => g.id).join(', ') || 'none'}.\nOpen actions: ${m.open.length}.`;
+    const notes = `SafeQMS Goal Management automated input (${today}):\nGoals on track: ${m.on.length}; at risk: ${m.risk.length}; off track: ${m.off.length}; not measured: ${m.notMeasured.length}.\nEscalated blockers (${m.blockers.length}):\n${blockerLines || 'none'}\nGoals with incomplete plans: ${m.gaps.map((g) => g.id).join(', ') || 'none'}.\nOpen actions: ${m.open.length}.`.slice(
+      0,
+      4000
+    );
 
     try {
       await setDoc(doc(db, 'workspaces', activeWorkspaceId, 'reviews', id), {
@@ -2772,7 +2836,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         id,
         title: 'Strategy and Management Review — Auto Draft',
         date: today,
-        scope,
+        scope: scope.slice(0, 120),
         notes,
         decisions: [],
         source: 'Management Review Inputs',
@@ -2782,9 +2846,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       toast('Draft review created with live KPI & blocker queue', 'success');
       return id;
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/reviews/${id}`);
+      return failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/reviews/${id}`, 'Could not create Management Review draft');
     }
-  }, [activeWorkspaceId, activeRole, goals, initiatives, domainSnapshot, reviews, today, baseFields, scope, toast]);
+  }, [activeWorkspaceId, activeRole, goals, initiatives, domainSnapshot, reviews, today, baseFields, scope, toast, failMutation]);
 
   const createCatchball = useCallback(
     async (input: { goalId: string; target: number; resources: string; due: string; reason: string; recipientScope: string }): Promise<string | null> => {
@@ -2799,6 +2863,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return null;
       }
       const id = nextCode(catchballs.map((c) => c.id), 'CB');
+      const targetNum = Number.isFinite(Number(input.target)) ? Number(input.target) : Number(g.target ?? 0);
+      const cleanResources = String(input.resources || '').slice(0, 1000);
+      const cleanReason = String(input.reason || '').trim().slice(0, 1000);
       const thread: Omit<CatchballThread, 'createdAt' | 'updatedAt'> = {
         ...baseFields(),
         id,
@@ -2808,18 +2875,18 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         updatedDate: today,
         origin: activeRole,
         recipientRole: leadershipRole(activeRole) ? 'Department director' : 'General director',
-        recipientScope: input.recipientScope || ASSIGNED_DEPARTMENT,
+        recipientScope: (input.recipientScope || ASSIGNED_DEPARTMENT).slice(0, 120),
         turn: activeRole,
-        proposal: { target: Number(input.target), resources: input.resources, due: input.due, reason: input.reason },
+        proposal: { target: targetNum, resources: cleanResources, due: (input.due || '2027-12-31').slice(0, 40), reason: cleanReason },
         messages: [
           {
             id: 'M-001',
             at: today,
             by: activeRole,
             kind: 'Draft',
-            text: input.reason,
-            target: Number(input.target),
-            resources: input.resources,
+            text: cleanReason,
+            target: targetNum,
+            resources: cleanResources,
           },
         ],
       };
@@ -2832,10 +2899,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         toast(`Catchball thread ${id} created`, 'success');
         return id;
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/catchballs/${id}`);
+        return failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/catchballs/${id}`, 'Could not create Catchball thread');
       }
     },
-    [activeWorkspaceId, goals, activeRole, initiatives, catchballs, baseFields, today, toast]
+    [activeWorkspaceId, goals, activeRole, initiatives, catchballs, baseFields, today, toast, failMutation]
   );
 
   const commentCatchball = useCallback(
@@ -2843,16 +2910,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (!activeWorkspaceId) return;
       const c = catchballs.find((x) => x.id === id);
       if (!c || !cbCanAct(c, 'comment', activeRole, goals, initiatives) || !message.trim()) return;
-      const msg = { id: nextCode(c.messages.map((m) => m.id), 'M'), at: today, by: activeRole, kind: 'Comment', text: message.trim() };
+      const msg = { id: nextCode(c.messages.map((m) => m.id), 'M'), at: today, by: activeRole, kind: 'Comment', text: message.trim().slice(0, 1000) };
       const batch = writeBatch(db);
       batch.update(doc(db, 'workspaces', activeWorkspaceId, 'catchballs', c.id), {
-        messages: [...c.messages, msg],
+        messages: [...c.messages, msg].slice(-50),
         updatedDate: today,
         updatedAt: serverTimestamp(),
       });
       const recips = leadershipRole(activeRole) ? ['Department director'] : ['General director', 'QMS auditor'];
       for (const rec of recips) {
-        const nid = `ACT-CBN-${Date.now().toString(36)}-${rec.slice(0, 2)}`;
+        const nid = `ACT-CBN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}-${rec.slice(0, 2)}`;
         batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', nid), {
           ...baseFields(),
           id: nid,
@@ -2867,10 +2934,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast('Comment added', 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/catchballs/${id}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/catchballs/${id}`, 'Could not post comment');
       }
     },
-    [activeWorkspaceId, catchballs, activeRole, goals, initiatives, today, baseFields, toast]
+    [activeWorkspaceId, catchballs, activeRole, goals, initiatives, today, baseFields, toast, failMutation]
   );
 
   const sendCatchball = useCallback(
@@ -2893,13 +2960,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       batch.update(doc(db, 'workspaces', activeWorkspaceId, 'catchballs', c.id), {
         status: nextStatus,
         turn: nextTurn,
-        messages: [...c.messages, msg],
+        messages: [...c.messages, msg].slice(-50),
         updatedDate: today,
         updatedAt: serverTimestamp(),
       });
       const recips = activeRole === 'Department director' ? ['General director', 'QMS auditor'] : ['Department director'];
       for (const rec of recips) {
-        const nid = `ACT-CBN-${Date.now().toString(36)}-${rec.slice(0, 2)}`;
+        const nid = `ACT-CBN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}-${rec.slice(0, 2)}`;
         batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', nid), {
           ...baseFields(),
           id: nid,
@@ -2914,10 +2981,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast('Proposal sent', 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/catchballs/${id}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/catchballs/${id}`, 'Could not send proposal');
       }
     },
-    [activeWorkspaceId, catchballs, activeRole, goals, initiatives, today, baseFields, toast]
+    [activeWorkspaceId, catchballs, activeRole, goals, initiatives, today, baseFields, toast, failMutation]
   );
 
   const counterCatchball = useCallback(
@@ -2935,27 +3002,29 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (!res) return;
       const nextStatus: CatchballThread['status'] = leadershipRole(activeRole) ? 'Awaiting department' : 'Awaiting director';
       const nextTurn = leadershipRole(activeRole) ? 'Department director' : 'General director';
+      const nextTarget = Number.isFinite(Number(res.target)) ? Number(res.target) : Number(c.proposal.target);
+      const nextResources = String(res.resources || '').slice(0, 1000);
       const msg = {
         id: nextCode(c.messages.map((m) => m.id), 'M'),
         at: today,
         by: activeRole,
         kind: 'Counterproposal',
-        text: res.reason,
-        target: res.target,
-        resources: res.resources,
+        text: String(res.reason || '').slice(0, 1000),
+        target: nextTarget,
+        resources: nextResources,
       };
       const batch = writeBatch(db);
       batch.update(doc(db, 'workspaces', activeWorkspaceId, 'catchballs', c.id), {
         status: nextStatus,
         turn: nextTurn,
-        proposal: { ...c.proposal, target: res.target, resources: res.resources },
-        messages: [...c.messages, msg],
+        proposal: { ...c.proposal, target: nextTarget, resources: nextResources },
+        messages: [...c.messages, msg].slice(-50),
         updatedDate: today,
         updatedAt: serverTimestamp(),
       });
       const recips = leadershipRole(activeRole) ? ['Department director'] : ['General director', 'QMS auditor'];
       for (const rec of recips) {
-        const nid = `ACT-CBN-${Date.now().toString(36)}-${rec.slice(0, 2)}`;
+        const nid = `ACT-CBN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}-${rec.slice(0, 2)}`;
         batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', nid), {
           ...baseFields(),
           id: nid,
@@ -2970,10 +3039,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast('Counterproposal sent', 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/catchballs/${id}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/catchballs/${id}`, 'Could not send counterproposal');
       }
     },
-    [activeWorkspaceId, catchballs, activeRole, goals, initiatives, showModal, today, baseFields, toast]
+    [activeWorkspaceId, catchballs, activeRole, goals, initiatives, showModal, today, baseFields, toast, failMutation]
   );
 
   const alignCatchball = useCallback(
@@ -2994,7 +3063,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         at: today,
         by: activeRole,
         kind: 'Alignment',
-        text: String(note).trim(),
+        text: String(note).trim().slice(0, 1000),
         target: c.proposal.target,
         resources: c.proposal.resources,
       };
@@ -3002,13 +3071,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       batch.update(doc(db, 'workspaces', activeWorkspaceId, 'catchballs', c.id), {
         status: 'Aligned',
         turn: '',
-        messages: [...c.messages, msg],
+        messages: [...c.messages, msg].slice(-50),
         updatedDate: today,
         updatedAt: serverTimestamp(),
       });
       const recips = leadershipRole(activeRole) ? ['Department director'] : ['General director', 'QMS auditor'];
       for (const rec of recips) {
-        const nid = `ACT-CBN-${Date.now().toString(36)}-${rec.slice(0, 2)}`;
+        const nid = `ACT-CBN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}-${rec.slice(0, 2)}`;
         batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', nid), {
           ...baseFields(),
           id: nid,
@@ -3023,10 +3092,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast('Catchball thread aligned', 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/catchballs/${id}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/catchballs/${id}`, 'Could not align Catchball');
       }
     },
-    [activeWorkspaceId, catchballs, activeRole, goals, initiatives, showModal, today, baseFields, toast]
+    [activeWorkspaceId, catchballs, activeRole, goals, initiatives, showModal, today, baseFields, toast, failMutation]
   );
 
   const requestChangesCatchball = useCallback(
@@ -3042,18 +3111,18 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         required: true,
       });
       if (!reason || !String(reason).trim()) return;
-      const msg = { id: nextCode(c.messages.map((m) => m.id), 'M'), at: today, by: activeRole, kind: 'Changes requested', text: String(reason).trim() };
+      const msg = { id: nextCode(c.messages.map((m) => m.id), 'M'), at: today, by: activeRole, kind: 'Changes requested', text: String(reason).trim().slice(0, 1000) };
       const batch = writeBatch(db);
       batch.update(doc(db, 'workspaces', activeWorkspaceId, 'catchballs', c.id), {
         status: 'Changes requested',
         turn: leadershipRole(activeRole) ? 'Department director' : 'General director',
-        messages: [...c.messages, msg],
+        messages: [...c.messages, msg].slice(-50),
         updatedDate: today,
         updatedAt: serverTimestamp(),
       });
       const recips = leadershipRole(activeRole) ? ['Department director'] : ['General director', 'QMS auditor'];
       for (const rec of recips) {
-        const nid = `ACT-CBN-${Date.now().toString(36)}-${rec.slice(0, 2)}`;
+        const nid = `ACT-CBN-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}-${rec.slice(0, 2)}`;
         batch.set(doc(db, 'workspaces', activeWorkspaceId, 'activities', nid), {
           ...baseFields(),
           id: nid,
@@ -3068,10 +3137,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await batch.commit();
         toast('Changes requested', 'info');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/catchballs/${id}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/catchballs/${id}`, 'Could not request changes');
       }
     },
-    [activeWorkspaceId, catchballs, activeRole, goals, initiatives, showModal, today, baseFields, toast]
+    [activeWorkspaceId, catchballs, activeRole, goals, initiatives, showModal, today, baseFields, toast, failMutation]
   );
 
   const markActivityRead = useCallback(
@@ -3111,7 +3180,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [importIsoCatalog]);
 
   const propagateMemberUids = useCallback(
-    async (wsId: string, nextMemberUids: string[], extraOps: Array<(b: ReturnType<typeof writeBatch>) => void> = []) => {
+    async (
+      wsId: string,
+      nextMemberUids: string[],
+      extraOps: Array<(b: ReturnType<typeof writeBatch>) => void> = [],
+      skipMemberIds?: Set<string>
+    ) => {
       const ops: Array<(b: ReturnType<typeof writeBatch>) => void> = [...extraOps];
       ops.push((b) =>
         b.update(doc(db, 'workspaces', wsId), {
@@ -3122,6 +3196,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       for (const sub of ALL_SUBCOLLECTIONS) {
         const snap = await getDocs(collection(db, 'workspaces', wsId, sub));
         snap.docs.forEach((d) => {
+          if (sub === 'members' && skipMemberIds?.has(d.id)) return;
           ops.push((b) =>
             b.update(d.ref, {
               memberUids: nextMemberUids,
@@ -3157,28 +3232,47 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return;
       }
       const nextUids = [...new Set([...activeWorkspace.memberUids, cleanUid])];
+      const existingMember = members.some((m) => m.uid === cleanUid);
       try {
-        await propagateMemberUids(activeWorkspace.id, nextUids, [
-          (b) =>
-            b.set(doc(db, 'workspaces', activeWorkspace.id, 'members', cleanUid), {
-              uid: cleanUid,
-              workspaceId: activeWorkspace.id,
-              ownerUid: activeWorkspace.ownerUid,
-              memberUids: nextUids,
-              displayName: displayName.trim().slice(0, 120),
-              safeqmsRole,
-              assignedSite,
-              assignedDepartment,
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            }),
-        ]);
+        await propagateMemberUids(
+          activeWorkspace.id,
+          nextUids,
+          [
+            (b) => {
+              const memberRef = doc(db, 'workspaces', activeWorkspace.id, 'members', cleanUid);
+              if (existingMember) {
+                b.update(memberRef, {
+                  memberUids: nextUids,
+                  displayName: displayName.trim().slice(0, 120),
+                  safeqmsRole,
+                  assignedSite: assignedSite.slice(0, 120),
+                  assignedDepartment: assignedDepartment.slice(0, 120),
+                  updatedAt: serverTimestamp(),
+                });
+              } else {
+                b.set(memberRef, {
+                  uid: cleanUid,
+                  workspaceId: activeWorkspace.id,
+                  ownerUid: activeWorkspace.ownerUid,
+                  memberUids: nextUids,
+                  displayName: displayName.trim().slice(0, 120),
+                  safeqmsRole,
+                  assignedSite: assignedSite.slice(0, 120),
+                  assignedDepartment: assignedDepartment.slice(0, 120),
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                });
+              }
+            },
+          ],
+          new Set([cleanUid])
+        );
         toast(`Added ${displayName.trim()} (${safeqmsRole}) to workspace`, 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspace.id}/members/${cleanUid}`);
+        failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspace.id}/members/${cleanUid}`, 'Could not add team member');
       }
     },
-    [activeWorkspace, isActualAdmin, propagateMemberUids, toast]
+    [activeWorkspace, isActualAdmin, members, propagateMemberUids, toast, failMutation]
   );
 
   const updateTeamMember = useCallback(
@@ -3191,16 +3285,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await updateDoc(doc(db, 'workspaces', activeWorkspace.id, 'members', uid), {
           displayName: patch.displayName.trim().slice(0, 120),
           safeqmsRole: patch.safeqmsRole,
-          assignedSite: patch.assignedSite,
-          assignedDepartment: patch.assignedDepartment,
+          assignedSite: patch.assignedSite.slice(0, 120),
+          assignedDepartment: patch.assignedDepartment.slice(0, 120),
           updatedAt: serverTimestamp(),
         });
         toast('Member role updated', 'success');
       } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspace.id}/members/${uid}`);
+        failMutation(err, OperationType.UPDATE, `workspaces/${activeWorkspace.id}/members/${uid}`, 'Could not update team member');
       }
     },
-    [activeWorkspace, isActualAdmin, toast]
+    [activeWorkspace, isActualAdmin, toast, failMutation]
   );
 
   const removeTeamMember = useCallback(
@@ -3212,15 +3306,18 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
       const nextUids = activeWorkspace.memberUids.filter((id) => id !== uid);
       try {
-        await propagateMemberUids(activeWorkspace.id, nextUids, [
-          (b) => b.delete(doc(db, 'workspaces', activeWorkspace.id, 'members', uid)),
-        ]);
+        await propagateMemberUids(
+          activeWorkspace.id,
+          nextUids,
+          [(b) => b.delete(doc(db, 'workspaces', activeWorkspace.id, 'members', uid))],
+          new Set([uid])
+        );
         toast('Member removed from workspace', 'info');
       } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `workspaces/${activeWorkspace.id}/members/${uid}`);
+        failMutation(err, OperationType.DELETE, `workspaces/${activeWorkspace.id}/members/${uid}`, 'Could not remove team member');
       }
     },
-    [activeWorkspace, isActualAdmin, propagateMemberUids, toast]
+    [activeWorkspace, isActualAdmin, propagateMemberUids, toast, failMutation]
   );
 
   const value: WorkspaceContextValue = {
