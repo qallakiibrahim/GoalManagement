@@ -178,6 +178,7 @@ export default function App() {
         <aside>
           <div className="group">Goal Management</div>
           <button className="nav" data-route="overview"><span>▦</span><span>Overview</span></button>
+          <button className="nav" data-route="daily"><span>◫</span><span>Daily Board</span></button>
           <button className="nav" data-route="strategy"><span>⑂</span><span>Strategy & Goals</span></button>
           <button className="nav" data-route="execution"><span>▤</span><span>Initiatives & Projects</span></button>
           <button className="nav" data-route="performance"><span>▥</span><span>Performance</span></button>
@@ -780,10 +781,25 @@ function initSafeQMSEngine() {
     catchballNotifications: [] as any[],
     catchballEvents: [] as any[],
     directorDecisionLog: [] as any[],
-    directorDecisionNotifications: [] as any[]
+    directorDecisionNotifications: [] as any[],
+    dailyTier: 'tier1',
+    safetyCross: {
+      'Department: Production': { '1': 'green', '2': 'green', '3': 'green', '4': 'amber', '5': 'green', '6': 'green', '7': 'green', '8': 'green', '9': 'red', '10': 'green', '11': 'green', '12': 'amber', '13': 'green', '14': 'green', '15': 'green' },
+      'Site: Uppsala': { '1': 'green', '2': 'green', '3': 'green', '4': 'amber', '5': 'green', '6': 'green', '7': 'green', '8': 'green', '9': 'red', '10': 'green', '11': 'green', '12': 'amber', '13': 'green', '14': 'green', '15': 'green' },
+      'Organization': { '1': 'green', '2': 'green', '3': 'green', '4': 'amber', '5': 'green', '6': 'green', '7': 'green', '8': 'green', '9': 'red', '10': 'green', '11': 'green', '12': 'amber', '13': 'green', '14': 'green', '15': 'green' }
+    } as Record<string, Record<string, string>>,
+    pulseCards: [
+      { id: 'PC-001', title: 'Line 3 pre-heating electrical delay on Shift B changeover', details: 'Pre-heater zone 2 trips thermal relay during rapid format switchovers, adding ~14 min downtime per batch.', due: '2027-07-18', scope: 'Department: Production', routeType: 'Escalate', owner: 'Team Leader', kpi: 'K-002', initiative: 'I-001', project: 'P-001', blockerId: 'BL-001', status: 'Escalated', createdAt: '2027-07-02', comments: [{ by: 'Team Leader', at: '2027-07-02', text: 'Occurred twice on Shift B. Needs electrical maintenance support & relay spare review.' }] },
+      { id: 'PC-002', title: 'Set up 5S shadow board for changeover wrenches at Line 3', details: 'Operators lose 4-6 min searching for torque wrench #14 during die swaps. Shadow board next to HMI solves this directly.', due: '2027-07-20', scope: 'Department: Production', routeType: 'Direct fix', owner: 'Team Leader', kpi: 'K-002', initiative: 'I-001', project: 'P-001', blockerId: '', status: 'Team action', createdAt: '2027-07-10', comments: [{ by: 'Team Leader', at: '2027-07-10', text: 'Foam insert ordered; mounting planned at Friday 5S slot.' }] },
+      { id: 'PC-003', title: 'Recurring glossy label glare causing false vision rejects', details: 'Overhead LED reflection on batch film triggers false camera reject alarms (~3.2% micro-stops on Line 1).', due: '2027-07-25', scope: 'Department: Quality', routeType: 'A3', owner: 'Quality Manager', kpi: 'K-007', initiative: 'I-007', project: 'P-003', blockerId: 'BL-002', status: 'Escalated', createdAt: '2027-07-05', comments: [{ by: 'Quality Manager', at: '2027-07-06', text: 'Linked to Vision Pilot P-003; awaiting polarizing lens quote.' }] },
+      { id: 'PC-004', title: 'Install QR hazard placard on hydraulic press guard', details: 'Quick-scan QR code linking straight to LOTO lockout checklist at press station.', due: '2027-06-30', scope: 'Department: Maintenance', routeType: 'Direct fix', owner: 'Safety Coordinator', kpi: 'K-008', initiative: 'I-006', project: 'P-004', blockerId: '', status: 'Done', createdAt: '2027-06-22', comments: [{ by: 'Safety Coordinator', at: '2027-06-28', text: 'Placard laminated, mounted, and verified during morning Gemba walk.' }] }
+    ],
+    myFocusOwner: ''
   });
 
   let S: any;
+  let pulseDelegateCardId: string | null = null;
+  let pulseOpenCardId: string | null = null;
   try {
     S = JSON.parse(localStorage.getItem(KEY) || '') || seed();
   } catch (e) {
@@ -958,6 +974,17 @@ function initSafeQMSEngine() {
       if (!('evidenceRefs' in g)) g.evidenceRefs = '';
       if (!g.revision) g.revision = 1;
     }
+    if (!S.dailyTier) S.dailyTier = 'tier1';
+    if (!S.safetyCross || typeof S.safetyCross !== 'object') S.safetyCross = JSON.parse(JSON.stringify(seed().safetyCross));
+    if (!Array.isArray(S.pulseCards)) S.pulseCards = JSON.parse(JSON.stringify(seed().pulseCards));
+    const defCards = seed().pulseCards;
+    for (const pc of S.pulseCards) {
+      const def = defCards.find((x: any) => x.id === pc.id);
+      if (pc.details === undefined) pc.details = def?.details || '';
+      if (pc.due === undefined) pc.due = def?.due || '';
+      if (!Array.isArray(pc.comments)) pc.comments = def?.comments ? JSON.parse(JSON.stringify(def.comments)) : [];
+    }
+    if (!('myFocusOwner' in S)) S.myFocusOwner = '';
   }
 
   function cleanFalseCompleteness() {
@@ -1054,6 +1081,8 @@ function initSafeQMSEngine() {
   }
 
   function go(route: string, id?: string) {
+    pulseOpenCardId = null;
+    pulseDelegateCardId = null;
     location.hash = route + (id ? '/' + id : '');
     render();
   }
@@ -1112,7 +1141,9 @@ function initSafeQMSEngine() {
 
   const SAFEQMS_ROLES = ['Administratör', 'General director', 'Department director', 'QMS auditor', 'Auditor', 'Basic user'];
   const ROUTE_GROUP: Record<string, string> = {
-    overview: 'overview', strategy: 'strategy', pillars: 'strategy', cascade: 'strategy', matrix: 'strategy', a3: 'strategy', goal: 'strategy', newgoal: 'strategy',
+    overview: 'overview',
+    daily: 'daily', myfocus: 'daily',
+    strategy: 'strategy', pillars: 'strategy', cascade: 'strategy', matrix: 'strategy', a3: 'strategy', goal: 'strategy', newgoal: 'strategy',
     execution: 'execution', projects: 'execution', project: 'execution', initiative: 'execution', newinitiative: 'execution',
     performance: 'performance', kpis: 'performance', import: 'performance',
     alignment: 'alignment', catchball: 'alignment', catchballitem: 'alignment', catchballnew: 'alignment', reviews: 'alignment', review: 'alignment', newreview: 'alignment', approvals: 'alignment',
@@ -1219,6 +1250,7 @@ function initSafeQMSEngine() {
     if (/updateInitiativeFocus\(/.test(x)) return roleCan('initiativeWrite');
     if (/restoreDemoISO\(|downloadISOSample\(|resetDemo\(|exportData\(/.test(x)) return isAdmin();
     if (/exportEvidence\(/.test(x)) return roleCan('evidence');
+    if (/toggleSafetyDay\(|createPulseCard\(|togglePulseCardDone\(|toggleDailyTask\(|escalatePulseCard\(|openPulseDelegate\(|closePulseDelegate\(|delegatePulseCard\(|savePulseCardDetails\(|addPulseCardComment\(/.test(x)) return !isAuditor();
     return true;
   }
 
@@ -1247,6 +1279,7 @@ function initSafeQMSEngine() {
   }
 
   const roleTabs: Record<string, string[][]> = {
+    daily: [['Tier 1–3 Pulse Board', 'daily'], ['My Focus', 'myfocus']],
     strategy: [['Main Goals', 'pillars'], ['Goal Cascade', 'cascade'], ['X-Matrix', 'matrix'], ['Strategy A3', 'a3']],
     execution: [['Portfolio & Projects', 'projects']],
     performance: [['KPI & Bowling Chart', 'kpis'], ['CSV Import', 'import']],
@@ -1408,6 +1441,22 @@ function initSafeQMSEngine() {
             b.status = 'In review';
             delete b.resolvedAt;
             changed = true;
+          }
+        }
+      }
+      if (Array.isArray(S.pulseCards)) {
+        for (const pc of S.pulseCards) {
+          if (pc.blockerId === b.id) {
+            if (!Array.isArray(pc.comments)) pc.comments = [];
+            if (b.status === 'Resolved' && pc.status !== 'Done') {
+              pc.status = 'Done';
+              pc.comments.push({ by: 'PDCA / Blocker Sync', at: today, text: `✓ Closed via Blocker ${b.id}${b.resolutionNote ? ': ' + b.resolutionNote : ''}` });
+              changed = true;
+            } else if (b.status !== 'Resolved' && pc.status === 'Done') {
+              pc.status = pc.delegatedBy ? 'Team action' : 'Escalated';
+              pc.comments.push({ by: 'PDCA / Blocker Sync', at: today, text: `Reopened via Blocker ${b.id}` });
+              changed = true;
+            }
           }
         }
       }
@@ -1660,6 +1709,8 @@ function initSafeQMSEngine() {
       }),
       ...(open > 0 ? [`<div class="minirow">◷ <button class="link" onclick="go('approvals')"><b>${open} goal(s) awaiting formal approval</b></button></div>`] : [])
     ];
+    const basicTasks = isBasic() ? S.tasks.filter((t: any) => roleCan('taskOwn', t) && t.status !== 'Done') : [];
+    const basicCards = isBasic() ? (S.pulseCards || []).filter((c: any) => c.status !== 'Done' && String(c.owner || '').toLowerCase() === 'team leader') : [];
     return head(
       isBasic() ? 'My Goals & Actions' : isDirector() ? 'Department Goal Overview' : isAuditor() ? 'Assigned Audit Scope' : isQMS() ? 'QMS Strategy & ISO Overview' : 'Strategy Overview',
       'From long-term ambition to measurable execution',
@@ -1669,11 +1720,302 @@ function initSafeQMSEngine() {
       ['Strategic & Annual Goals', vg.length, 'Aligned across levels'],
       ['On Track', vg.filter((g: any) => g.performance === 'On track').length, 'Performance status'],
       ['Active Initiatives', S.initiatives.filter((i: any) => visibleInitiative(i) && i.status !== 'Planned').length, 'Projects in execution'],
-      [isBasic() ? 'My Actions' : 'Escalated Blockers', isBasic() ? S.tasks.filter((t: any) => roleCan('taskOwn', t) && t.status !== 'Done').length : openBlockers.length, isBasic() ? 'Assigned tasks' : `${exceptions.filter(e => e.isAuto).length} red/at-risk signals · ${open} approvals`]
+      [isBasic() ? 'My Actions' : 'Escalated Blockers', isBasic() ? (basicTasks.length + basicCards.length) : openBlockers.length, isBasic() ? `${basicTasks.length} tasks · ${basicCards.length} kanban` : `${exceptions.filter(e => e.isAuto).length} red/at-risk signals · ${open} approvals`]
     ].map(c => `<div class="card"><div class="label">${c[0]}</div><div class="num">${c[1]}</div><div class="xs muted">${c[2]}</div></div>`).join('')}</div>
     <div class="grid2">${panel('Strategic Priorities', table(['Goal', 'Level', 'Performance'], vg.slice(0, 7).map((g: any) => `<tr class="click" onclick="go('goal','${g.id}')"><td><b>${esc(g.title)}</b><div class="xs muted">${g.id}</div></td><td class="small">${esc(g.level)}</td><td>${badge(g.performance)}</td></tr>`)))}
-    ${isBasic() ? panel('My Assigned Actions', S.tasks.filter((t: any) => roleCan('taskOwn', t)).map((t: any) => `<div class="minirow"><b>${esc(t.title)}</b> ${badge(t.status)}<div class="xs muted">${esc(t.owner)} · ${esc(t.due)}</div></div>`).join('') || '<p>No assigned tasks</p>') : panel(`Management Attention · Exceptions (${exceptions.length})`, `${attentionRows.join('') || '<p class="small muted">All KPIs on track and no active blockers escalated in this scope.</p>'}<div class="actions" style="margin-top:15px">${btn('Open PDCA Exception Queue', "go('reviews')", 'primary')}${btn('Review approvals', "go('approvals')")}</div>`)}</div>
+    ${isBasic() ? panel('My Assigned Actions', [
+      ...basicCards.map((c: any) => `<div class="minirow"><button class="link" onclick="window.openPulseCardFromFocus('${esc(c.id)}')"><b>${esc(c.title)}</b></button> <span class="pill ${c.delegatedBy ? 'teal' : 'amber'}">${c.delegatedBy ? '↳ Delegated' : 'Kanban'}</span><div class="xs muted">${esc(c.scope)} · ${esc(c.due || c.createdAt)}</div></div>`),
+      ...S.tasks.filter((t: any) => roleCan('taskOwn', t)).map((t: any) => `<div class="minirow"><b>${esc(t.title)}</b> ${badge(t.status)}<div class="xs muted">${esc(t.owner)} · ${esc(t.due)}</div></div>`)
+    ].join('') || '<p>No assigned tasks or Kanban actions</p>') : panel(`Management Attention · Exceptions (${exceptions.length})`, `${attentionRows.join('') || '<p class="small muted">All KPIs on track and no active blockers escalated in this scope.</p>'}<div class="actions" style="margin-top:15px">${btn('Open PDCA Exception Queue', "go('reviews')", 'primary')}${btn('Review approvals', "go('approvals')")}</div>`)}</div>
     ${panel('Strategy-to-execution flow', `<div class="flow"><div class="step active">Organization strategy</div>→<div class="step active">Site annual goals</div>→<div class="step active">Department objectives</div>→<div class="step">Initiatives / projects</div>→<div class="step">Activities</div>→<div class="step">KPI / PDCA</div></div><p class="small muted">One shared data model. Project completion and actual goal performance are deliberately separate; escalated blockers surface directly into PDCA Reviews.</p>`)}`;
+  }
+
+  function safetyCrossHtml(scopeKey: string) {
+    const daysMap = S.safetyCross?.[scopeKey] || S.safetyCross?.['Organization'] || {};
+    const rows = [
+      [0, 0, 1, 2, 3, 0, 0],
+      [0, 0, 4, 5, 6, 0, 0],
+      [7, 8, 9, 10, 11, 12, 13],
+      [14, 15, 16, 17, 18, 19, 20],
+      [21, 22, 23, 24, 25, 26, 27],
+      [0, 0, 28, 29, 30, 0, 0],
+      [0, 0, 0, 31, 0, 0, 0]
+    ];
+    let g = 0, a = 0, r = 0;
+    for (let d = 1; d <= 31; d++) {
+      const st = daysMap[String(d)];
+      if (st === 'green') g++; else if (st === 'amber') a++; else if (st === 'red') r++;
+    }
+    const disabled = isAuditor() ? 'disabled' : '';
+    return `<div class="sc-wrap"><div class="sc-cross">${rows.flat().map(d => {
+      if (!d) return '<div class="sc-cell empty"></div>';
+      const st = daysMap[String(d)] || '';
+      return `<button type="button" class="sc-cell ${st}" ${disabled} title="Day ${d}: ${st || 'Not logged'} (click to toggle)" onclick="window.toggleSafetyDay('${esc(scopeKey)}',${d})">${d}</button>`;
+    }).join('')}</div><div class="sc-legend"><span><b style="color:var(--green)">● ${g}</b> OK</span><span><b style="color:var(--amber)">● ${a}</b> Near-miss</span><span><b style="color:var(--red)">● ${r}</b> Incident</span><span class="xs">${isAuditor() ? 'Read-only' : 'Click day to toggle'}</span></div></div>`;
+  }
+
+  function dailyBoard() {
+    const tier = S.dailyTier || 'tier1';
+    const scopedGoals = roleVisibleGoals();
+    const scopedKpis = S.kpis.filter((k: any) => (S.scope === 'Organization' && !limitedRole()) || scopedGoals.some((g: any) => g.kpi === k.id));
+    const cards = (S.pulseCards || []).filter((pc: any) =>
+      (!limitedRole() || blockerMatchesScope(pc.scope, ASSIGNED_DEPARTMENT)) &&
+      blockerMatchesScope(pc.scope, S.scope)
+    );
+    const canEditBoard = !isAuditor();
+    const delegateScopes = ['Department: Production', 'Department: Maintenance', 'Department: Quality', 'Site: Uppsala', 'Site: Falkenberg', 'Organization'];
+    const delegateOwners = ['Team Leader', 'Project Leader', 'Production Manager', 'Maintenance Manager', 'Quality Manager', 'EHS Manager', 'Safety Coordinator', 'Site Manager', 'Executive Management'];
+
+    const teamActionCards = cards.filter((c: any) => c.status === 'Team action');
+    const escalatedCards = cards.filter((c: any) => c.status === 'Escalated');
+    const doneCards = cards.filter((c: any) => c.status === 'Done');
+
+    const renderPulseCard = (c: any) => {
+      const k = c.kpi ? kpi(c.kpi) : null;
+      const isDelegating = pulseDelegateCardId === c.id;
+      const commentCount = Array.isArray(c.comments) ? c.comments.length : 0;
+      return `<div class="pulse-card ${c.status === 'Escalated' ? 'escalated' : c.status === 'Done' ? 'done' : c.delegatedBy ? 'delegated' : ''}" onclick="window.openPulseCard('${esc(c.id)}', event)" title="Click card to open details">
+        <div class="pulse-card-top">
+          <div class="pulse-card-title">${esc(c.title)}</div>
+          <span class="xs muted" style="white-space:nowrap">Open ↗</span>
+        </div>
+        <div class="pulse-card-meta">
+          <span class="pill ${c.routeType === 'Escalate' ? 'red' : c.routeType === 'A3' ? 'amber' : 'teal'}">${esc(c.routeType)}</span>
+          <span class="pill">${esc(c.scope)}</span>
+          <span><b>${esc(c.owner)}</b></span>
+          ${k ? `<span>· ${esc(k.id)}</span>` : ''}
+          ${c.due ? `<span>· Due ${esc(c.due)}</span>` : ''}
+          ${commentCount ? `<span>· 💬 ${commentCount}</span>` : ''}
+          ${c.blockerId ? `<span class="pill red">⚑ ${esc(c.blockerId)}</span>` : ''}
+          ${c.delegatedBy ? `<span class="pill teal">↳ Delegated by ${esc(c.delegatedBy)}</span>` : ''}
+        </div>
+        ${c.delegationNote ? `<div class="pulse-note">↳ ${esc(c.delegationNote)}</div>` : ''}
+        <div class="actions no-print">
+          ${canEditBoard ? `<button type="button" class="btn xs" onclick="window.togglePulseCardDone('${esc(c.id)}')">${c.status === 'Done' ? 'Reopen' : '✓ Done'}</button>` : ''}
+          ${canEditBoard && c.status === 'Team action' ? `<button type="button" class="btn xs" onclick="window.escalatePulseCard('${esc(c.id)}')">↑ Escalate</button>` : ''}
+          ${canEditBoard && c.status !== 'Done' ? `<button type="button" class="btn xs" onclick="window.openPulseDelegate('${esc(c.id)}')">↳ Delegate</button>` : ''}
+          ${c.project ? `<button type="button" class="btn xs" onclick="go('project','${esc(c.project)}')">A3</button>` : ''}
+        </div>
+        ${isDelegating && canEditBoard ? `<form class="pulse-delegate no-print" onsubmit="window.delegatePulseCard(event,'${esc(c.id)}')">
+          <div class="pulse-delegate-row">
+            <select name="scope" title="Delegate to team / unit">${delegateScopes.map(sc => `<option value="${esc(sc)}" ${c.scope === sc ? 'selected' : ''}>${esc(sc)}</option>`).join('')}</select>
+            <select name="owner" title="Assign responsible owner">${delegateOwners.map(ow => `<option value="${esc(ow)}" ${c.owner === ow ? 'selected' : ''}>${esc(ow)}</option>`).join('')}</select>
+          </div>
+          <input name="note" type="text" value="${esc(c.delegationNote || '')}" placeholder="Optional action / handover note...">
+          <div class="actions"><button type="submit" class="btn xs primary">Confirm Delegate</button><button type="button" class="btn xs" onclick="window.closePulseDelegate()">Cancel</button></div>
+        </form>` : ''}
+      </div>`;
+    };
+
+    const openCard = pulseOpenCardId ? (S.pulseCards || []).find((x: any) => x.id === pulseOpenCardId) : null;
+    const pulseCardModalHtml = () => {
+      if (!openCard) return '';
+      const k = openCard.kpi ? kpi(openCard.kpi) : null;
+      const kSt = k ? computeKpiStatus(k) : null;
+      const initObj = openCard.initiative ? initiative(openCard.initiative) : null;
+      const projObj = openCard.project ? S.projects.find((p: any) => p.id === openCard.project) : null;
+      const blockerObj = openCard.blockerId ? (S.blockers || []).find((b: any) => b.id === openCard.blockerId) : null;
+      const comments = Array.isArray(openCard.comments) ? openCard.comments : [];
+      return `<div class="pulse-modal-backdrop no-print" onclick="if(event.target===this)window.closePulseCard()">
+        <div class="pulse-modal" role="dialog" aria-modal="true">
+          <div class="pulse-modal-head">
+            <div>
+              <div class="pulse-card-meta" style="margin-bottom:5px">
+                <span class="pill">${esc(openCard.id)}</span>
+                ${badge(openCard.status)}
+                <span class="pill">${esc(openCard.scope)}</span>
+                <span class="xs muted">Created ${esc(openCard.createdAt || today)}</span>
+              </div>
+              <h2 style="margin:0;font-size:18px">${esc(openCard.title)}</h2>
+            </div>
+            <button type="button" class="btn xs" onclick="window.closePulseCard()">✕ Close</button>
+          </div>
+
+          <div class="pulse-modal-section">
+            <h4>Details & Context</h4>
+            ${canEditBoard ? `<form onsubmit="window.savePulseCardDetails(event,'${esc(openCard.id)}')">
+              <div class="formgrid">
+                <div class="field" style="grid-column:1/-1"><label>Title</label><input name="title" type="text" required value="${esc(openCard.title)}"></div>
+                <div class="field" style="grid-column:1/-1"><label>Description / Problem & Context</label><textarea name="details" rows="3" placeholder="Describe what happened, station/shift, and what action is needed...">${esc(openCard.details || '')}</textarea></div>
+                <div class="field"><label>Path / Method</label><select name="routeType">${['Direct fix', 'A3', 'Escalate'].map(rt => `<option value="${rt}" ${openCard.routeType === rt ? 'selected' : ''}>${rt}</option>`).join('')}</select></div>
+                <div class="field"><label>Due Date</label><input name="due" type="date" value="${esc(openCard.due || '')}"></div>
+                <div class="field"><label>Linked KPI</label><select name="kpi"><option value="">None</option>${S.kpis.map((x: any) => `<option value="${esc(x.id)}" ${openCard.kpi === x.id ? 'selected' : ''}>${esc(x.id)} · ${esc(x.name)}</option>`).join('')}</select></div>
+              </div>
+              <div class="actions" style="margin-top:8px"><button type="submit" class="btn xs primary">Save Details</button></div>
+            </form>` : `<p class="small">${esc(openCard.details || 'No additional description logged.')}</p><div class="xs muted">Owner: <b>${esc(openCard.owner)}</b> · Due: <b>${esc(openCard.due || 'Not set')}</b></div>`}
+          </div>
+
+          <div class="pulse-modal-section">
+            <h4>Links, Escalation & Delegation</h4>
+            <div class="minirow"><span>Current Owner & Team</span><span><b>${esc(openCard.owner)}</b> · <span class="pill">${esc(openCard.scope)}</span></span></div>
+            ${openCard.delegatedBy ? `<div class="minirow"><span>Delegation</span><span>↳ Delegated by <b>${esc(openCard.delegatedBy)}</b> (${esc(openCard.delegatedAt || '')}) ${openCard.delegationNote ? `— "${esc(openCard.delegationNote)}"` : ''}</span></div>` : ''}
+            ${k ? `<div class="minirow"><span>Linked KPI: <b>${esc(k.id)} · ${esc(k.name)}</b> (${kSt?.actual ?? '—'} / ${kSt?.target ?? '—'} ${esc(k.unit)})</span><span class="actions">${badge(kSt?.label || '')}<button type="button" class="btn xs" onclick="go('kpis','${esc(k.id)}')">KPI Chart</button></span></div>` : ''}
+            ${initObj ? `<div class="minirow"><span>Initiative: <b>${esc(initObj.title)}</b> (${initObj.progress}%)</span><button type="button" class="btn xs" onclick="go('initiative','${esc(initObj.id)}')">Open Initiative</button></div>` : ''}
+            ${projObj ? `<div class="minirow"><span>Project A3: <b>${esc(projObj.title)}</b> (${projObj.progress}%)</span><button type="button" class="btn xs" onclick="go('project','${esc(projObj.id)}')">Open A3</button></div>` : ''}
+            ${blockerObj ? `<div class="minirow"><span>PDCA Blocker: <b>⚑ ${esc(blockerObj.id)}</b> (${esc(blockerObj.severity)})</span><span class="actions">${badge(blockerObj.status)}<button type="button" class="btn xs" onclick="go('reviews')">PDCA Queue</button></span></div>` : ''}
+            ${canEditBoard ? `<div class="actions" style="margin-top:10px">
+              <button type="button" class="btn xs" onclick="window.togglePulseCardDone('${esc(openCard.id)}')">${openCard.status === 'Done' ? 'Reopen Card' : '✓ Mark Done'}</button>
+              ${openCard.status === 'Team action' ? `<button type="button" class="btn xs" onclick="window.escalatePulseCard('${esc(openCard.id)}')">↑ Escalate to Tier 2/3</button>` : ''}
+            </div>
+            ${openCard.status !== 'Done' ? `<form class="pulse-delegate" onsubmit="window.delegatePulseCard(event,'${esc(openCard.id)}')">
+              <div class="xs muted"><b>↳ Delegate / Reassign to Team or Owner</b></div>
+              <div class="pulse-delegate-row">
+                <select name="scope">${delegateScopes.map(sc => `<option value="${esc(sc)}" ${openCard.scope === sc ? 'selected' : ''}>${esc(sc)}</option>`).join('')}</select>
+                <select name="owner">${delegateOwners.map(ow => `<option value="${esc(ow)}" ${openCard.owner === ow ? 'selected' : ''}>${esc(ow)}</option>`).join('')}</select>
+              </div>
+              <input name="note" type="text" value="${esc(openCard.delegationNote || '')}" placeholder="Handover / action instruction...">
+              <div class="actions"><button type="submit" class="btn xs primary">Confirm Delegate</button></div>
+            </form>` : ''}` : ''}
+          </div>
+
+          <div class="pulse-modal-section" style="margin-bottom:0">
+            <h4>Stand-up Notes & Log (${comments.length})</h4>
+            <div class="pulse-comments">
+              ${comments.map((cm: any) => `<div class="pulse-comment"><div class="xs muted"><b>${esc(cm.by)}</b> · ${esc(cm.at)}</div><div style="margin-top:2px">${esc(cm.text)}</div></div>`).join('') || '<p class="xs muted">No updates logged yet.</p>'}
+            </div>
+            ${canEditBoard ? `<form class="actions" style="flex-wrap:nowrap" onsubmit="window.addPulseCardComment(event,'${esc(openCard.id)}')">
+              <input name="text" type="text" required placeholder="Add stand-up note or progress update..." style="flex:1">
+              <button type="submit" class="btn xs primary">Post</button>
+            </form>` : ''}
+          </div>
+        </div>
+      </div>`;
+    };
+
+    const pulseBoardPanel = panel(`Daily Pulse & Kaizen Cards (${cards.filter((c: any) => c.status !== 'Done').length} open)`,
+      (canEditBoard ? `<form class="pulse-add no-print" onsubmit="window.createPulseCard(event)">
+        <div class="field" style="margin:0"><label>Issue / Kaizen improvement *</label><input name="title" type="text" required placeholder="e.g. Sensor trip at Line 2 carton feeder..."></div>
+        <div class="field" style="margin:0"><label>Path</label><select name="routeType"><option value="Direct fix">Direct fix (Team)</option><option value="A3">Needs Root Cause (A3)</option><option value="Escalate">Escalate ↑ (Tier 2/3)</option></select></div>
+        <div class="field" style="margin:0"><label>KPI / Line</label><select name="kpi"><option value="">Optional KPI</option>${scopedKpis.map((k: any) => `<option value="${esc(k.id)}">${esc(k.id)} · ${esc(k.name)}</option>`).join('')}</select></div>
+        <div class="field" style="margin:0"><label>Owner</label><input name="owner" type="text" value="${isBasic() ? 'Team Leader' : isDirector() ? 'Production Manager' : esc(role())}"></div>
+        <button class="btn primary" type="submit">+ Add Card</button>
+      </form>` : '') +
+      `<div class="pulse-cols">
+        <div class="pulse-col"><div class="pulse-col-head"><span>Team Action / Delegated</span><span class="pill">${teamActionCards.length}</span></div>${teamActionCards.map(renderPulseCard).join('') || '<p class="xs muted">No active team cards.</p>'}</div>
+        <div class="pulse-col"><div class="pulse-col-head"><span>Escalated (Tier 2 / 3)</span><span class="pill red">${escalatedCards.length}</span></div>${escalatedCards.map(renderPulseCard).join('') || '<p class="xs muted">Nothing escalated.</p>'}</div>
+        <div class="pulse-col"><div class="pulse-col-head"><span>Done</span><span class="pill green">${doneCards.length}</span></div>${doneCards.slice(0, 6).map(renderPulseCard).join('') || '<p class="xs muted">No completed cards yet.</p>'}</div>
+      </div>`
+    );
+
+    const units = limitedRole()
+      ? [ASSIGNED_SITE, ASSIGNED_DEPARTMENT]
+      : ['Site: Uppsala', 'Site: Falkenberg', 'Department: Production', 'Department: Maintenance', 'Department: Quality'];
+
+    const unitMatches = (itemScope: string, unit: string) => itemScope === unit || (unit === ASSIGNED_SITE && String(itemScope || '').startsWith('Department:'));
+    const scorecardHtml = `<div class="scorecard-grid">${units.map(u => {
+      const uGoals = S.goals.filter((g: any) => visibleToRole(g) && (u === ASSIGNED_SITE ? (g.level === u || g.level.startsWith('Department:')) : g.level === u));
+      const onCount = uGoals.filter((g: any) => g.performance === 'On track').length;
+      const offCount = uGoals.filter((g: any) => g.performance === 'Off track').length;
+      const riskCount = uGoals.filter((g: any) => g.performance === 'At risk').length;
+      const uCards = (S.pulseCards || []).filter((c: any) => unitMatches(c.scope, u) && c.status !== 'Done').length;
+      const uBlockers = (S.blockers || []).filter((b: any) => b.status !== 'Resolved' && unitMatches(b.scope, u)).length;
+      return `<div class="scorecard-tile" onclick="window.focusUnitDaily('${esc(u)}')" title="Click to open ${esc(u)} Tier 1 board">
+        <h3><span>${esc(u)}</span>${offCount ? badge('Off track') : riskCount ? badge('At risk') : badge('On track')}</h3>
+        <div class="minirow">Goals: <b>${onCount}/${uGoals.length}</b> On track</div>
+        <div class="minirow">Open Pulse Cards: <b>${uCards}</b></div>
+        <div class="minirow">Escalated Blockers: <b style="color:${uBlockers ? 'var(--red)' : 'inherit'}">${uBlockers}</b></div>
+      </div>`;
+    }).join('')}</div>`;
+
+    const scopedProjects = S.projects.filter((p: any) => visibleProject(p));
+    const scopedTasks = S.tasks.filter((t: any) => scopedProjects.some((p: any) => p.id === t.project) && (!isBasic() || roleCan('taskOwn', t)));
+
+    const tierContent = tier === 'tier1'
+      ? `<div class="grid2">
+          ${panel(`Safety & Quality Cross · ${esc(S.scope)}`, safetyCrossHtml(S.scope))}
+          ${panel(`Live KPI Pulse (${scopedKpis.length})`, scopedKpis.slice(0, 6).map((k: any) => {
+            const st = computeKpiStatus(k);
+            return `<div class="minirow"><span><b>${esc(k.name)}</b> <span class="xs muted">(${st.actual ?? '—'} / ${st.target ?? '—'} ${esc(k.unit)})</span></span>${badge(st.label)}</div>`;
+          }).join('') || '<p class="small muted">No KPIs in selected scope.</p>')}
+        </div>
+        ${pulseBoardPanel}
+        ${panel('Active Team Tasks (1-click syncs Project & Initiative %)', table(['Task', 'Project', 'Owner', 'Due', 'Status'], scopedTasks.filter((t: any) => t.status !== 'Done').slice(0, 10).map((t: any) => {
+          const p = S.projects.find((x: any) => x.id === t.project);
+          const canToggle = !isAuditor() && (!isBasic() ? roleCan('projectWrite', p) : roleCan('taskOwn', t));
+          return `<tr><td><b>${esc(t.title)}</b></td><td class="xs">${esc(p?.title || t.project)}</td><td>${esc(t.owner)}</td><td>${esc(t.due)}</td><td>${canToggle ? `<button type="button" class="link" onclick="window.toggleDailyTask('${t.id}')" title="Click to advance status">${badge(t.status)}</button>` : badge(t.status)}</td></tr>`;
+        })))}`
+      : tier === 'tier2'
+      ? `${panel('Site & Department Scorecard (Tier 2 Roll-Up)', scorecardHtml)}
+         ${pulseBoardPanel}`
+      : `${panel('Tier 3 · Digital Obeya & Management Exceptions', (() => {
+          const queue = pdcaExceptionQueue(S.scope, true);
+          return `<p class="small muted">Combines escalated Tier 1/2 Pulse issues, Open Blockers, and Off-track KPIs for leadership decision.</p>` +
+            (queue.length ? queue.map((b: any) => blockerBoxHtml(b, true)).join('') : '<p class="small muted">No open exceptions in selected scope.</p>');
+        })())}
+        ${pulseBoardPanel}`;
+
+    return head('Daily Management Board', 'Tiered stand-up meetings connected directly to Goals, Projects, KPIs & PDCA', btn('My Focus', "go('myfocus')", 'teal') + btn('PDCA Reviews', "go('reviews')")) +
+      roleScopebar() +
+      `<div class="tierbar no-print">
+        <button type="button" class="tierbtn ${tier === 'tier1' ? 'active' : ''}" onclick="window.setDailyTier('tier1')">Tier 1 · Team Pulse</button>
+        <button type="button" class="tierbtn ${tier === 'tier2' ? 'active' : ''}" onclick="window.setDailyTier('tier2')">Tier 2 · Site Scorecard</button>
+        <button type="button" class="tierbtn ${tier === 'tier3' ? 'active' : ''}" onclick="window.setDailyTier('tier3')">Tier 3 · Management Obeya</button>
+      </div>` +
+      tierContent +
+      pulseCardModalHtml();
+  }
+
+  function roleDefaultOwnerNames(): string[] {
+    if (S.myFocusOwner) return [S.myFocusOwner];
+    if (isGeneral()) return ['Executive Management', 'General director'];
+    if (isQMS()) return ['Quality Manager', 'QMS auditor'];
+    if (isDirector()) return ['Production Manager', 'Department director', 'Project Leader'];
+    if (isBasic()) return ['Team Leader'];
+    return ['Site Manager', 'Production Manager', 'Quality Manager', 'Maintenance Manager', 'EHS Manager', 'Safety Coordinator'];
+  }
+
+  function myFocus() {
+    const names = roleDefaultOwnerNames();
+    const match = (owner: string) => names.some(n => String(owner || '').toLowerCase() === n.toLowerCase());
+    const allLeaders = ['Executive Management', 'Site Manager', 'Production Manager', 'Maintenance Manager', 'Quality Manager', 'EHS Manager', 'Safety Coordinator', 'Project Leader', 'Team Leader'];
+
+    const myKpis = (S.kpiOwners || [])
+      .filter((r: any) => match(r.owner))
+      .map((r: any) => ({ ...r, k: kpi(r.kpi), st: computeKpiStatus(kpi(r.kpi)) }))
+      .filter((x: any) => x.k);
+
+    const myGoals = S.goals.filter((g: any) => visibleToRole(g) && match(g.owner));
+    const showCatchballForOwner = !S.myFocusOwner || ['Executive Management', 'Production Manager', 'Quality Manager'].includes(S.myFocusOwner);
+    const myCatchballs = (isBasic() || !showCatchballForOwner) ? [] : (S.catchballs || []).filter((c: any) => {
+      const turn = cbTurn(c);
+      if (S.myFocusOwner === 'Production Manager') return !['Approved', 'Cancelled'].includes(c.status) && turn === 'Department director';
+      if (S.myFocusOwner === 'Executive Management' || S.myFocusOwner === 'Quality Manager') return !['Approved', 'Cancelled'].includes(c.status) && leadershipRole(turn || '');
+      return !['Approved', 'Cancelled'].includes(c.status) && (turn === role() || (isLeadership() && leadershipRole(turn || '')));
+    });
+    const myInits = S.initiatives.filter((i: any) => visibleInitiative(i) && match(i.owner));
+    const myTasks = S.tasks.filter((t: any) => t.status !== 'Done' && (match(t.owner) || (!S.myFocusOwner && isDirector() && visibleProject(S.projects.find((p: any) => p.id === t.project) || { initiative: '' }))));
+    const myPulseCards = (S.pulseCards || []).filter((c: any) => c.status !== 'Done' && match(c.owner));
+    const myDecisions = isBasic() ? [] : S.reviews.flatMap((r: any) => r.decisions.filter((d: any) => d.status === 'Open' && match(d.owner)).map((d: any) => ({ ...d, reviewId: r.id })));
+    const myBlockers = isBasic() ? [] : (S.blockers || []).filter((b: any) => b.status !== 'Resolved' && match(b.owner) && blockerAllowedByRole(b));
+
+    return head('My Focus · Personal Obeya', `Personal goals, KPIs, initiatives & actions for ${esc(S.myFocusOwner || role())}`, btn('Daily Pulse Board', "go('daily')", 'teal')) +
+      (!isBasic() ? `<div class="toolbar no-print"><label class="small">View leader / role focus <select onchange="window.setMyFocusOwner(this.value)"><option value="">Auto (${esc(role())})</option>${allLeaders.map(l => `<option value="${esc(l)}" ${S.myFocusOwner === l ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label></div>` : '') +
+      `<div class="cards">${[
+        ['My KPIs (SE Wing)', myKpis.length, `${myKpis.filter((x: any) => x.strength === 2).length} Primary ●`],
+        ['My Goals & Catchball', myGoals.length + myCatchballs.length, `${myCatchballs.length} waiting reply`],
+        ['My Initiatives', myInits.length, 'Linked improvement streams'],
+        ['Open Actions', myTasks.length + myPulseCards.length + myDecisions.length + myBlockers.length, `${myTasks.length} tasks · ${myPulseCards.length} kanban · ${myDecisions.length + myBlockers.length} PDCA/blockers`]
+      ].map(c => `<div class="card"><div class="label">${c[0]}</div><div class="num">${c[1]}</div><div class="xs muted">${c[2]}</div></div>`).join('')}</div>` +
+      `<div class="grid2">
+        ${panel('My KPI Accountability (from X-Matrix SE)', myKpis.length ? myKpis.map((x: any) => `<div class="minirow"><span><span class="pill ${x.strength === 2 ? 'purple' : 'teal'}">${x.strength === 2 ? '● Primary' : '○ Support'}</span> <b>${esc(x.k.name)}</b> <span class="xs muted">(${x.st.actual ?? '—'} / ${x.st.target ?? '—'})</span></span>${badge(x.st.label)}</div>`).join('') : '<p class="small muted">No KPI accountability assigned to this owner.</p>')}
+        ${panel('My Goals & Catchball Queue', [
+          ...myCatchballs.map((c: any) => `<div class="minirow"><button class="link" onclick="go('catchballitem','${c.id}')"><b>⟳ ${esc(c.id)}: ${esc(cbGoalReadable(c))}</b></button>${cbStatusBadge(c.status)}</div>`),
+          ...myGoals.map((g: any) => `<div class="minirow"><button class="link" onclick="go('goal','${g.id}')"><b>${esc(g.id)} · ${esc(g.title)}</b></button>${badge(g.performance)}</div>`)
+        ].join('') || '<p class="small muted">No goals or Catchball items assigned.</p>')}
+      </div>` +
+      `<div class="grid2">
+        ${panel('My Initiatives & Projects', myInits.length ? myInits.map((i: any) => `<div class="minirow"><button class="link" onclick="go('initiative','${i.id}')"><b>${esc(i.title)}</b></button><span>${sqdcStripHtml(i, true)} <b>${i.progress}%</b> ${badge(i.status)}</span></div>`).join('') : '<p class="small muted">No initiatives directly owned.</p>')}
+        ${panel('My Open Tasks, Kanban & PDCA Decisions', [
+          ...myPulseCards.map((c: any) => `<div class="minirow"><span><span class="pill ${c.delegatedBy ? 'teal' : 'amber'}">${c.delegatedBy ? '↳ Delegated' : 'Kanban'}</span> <button class="link" onclick="window.openPulseCardFromFocus('${esc(c.id)}')"><b>${esc(c.title)}</b></button> <span class="xs muted">· ${esc(c.scope)}</span></span>${!isAuditor() ? `<button type="button" class="btn xs" onclick="window.togglePulseCardDone('${esc(c.id)}')">✓ Done</button>` : badge(c.status)}</div>`),
+          ...myBlockers.map((b: any) => `<div class="minirow"><button class="link" onclick="go('reviews')"><b>⚑ ${esc(b.id)}:</b> ${esc(b.summary)}</button>${badge(b.status)}</div>`),
+          ...myTasks.slice(0, 8).map((t: any) => {
+            const p = S.projects.find((x: any) => x.id === t.project);
+            const canToggle = !isAuditor() && (!isBasic() ? roleCan('projectWrite', p) : roleCan('taskOwn', t));
+            return `<div class="minirow"><span><b>${esc(t.title)}</b> <span class="xs muted">· ${esc(t.due)}</span></span>${canToggle ? `<button type="button" class="link" onclick="window.toggleDailyTask('${t.id}')">${badge(t.status)}</button>` : badge(t.status)}</div>`;
+          }),
+          ...myDecisions.map((d: any) => `<div class="minirow"><button class="link" onclick="go('review','${d.reviewId}')"><b>PDCA (${esc(d.reviewId)}):</b> ${esc(d.text)}</button>${badge(d.status)}</div>`)
+        ].join('') || '<p class="small muted">All assigned tasks, Kanban cards and PDCA actions are complete!</p>')}
+      </div>`;
   }
 
   function strategicPillarCards(compact = false) {
@@ -2788,6 +3130,8 @@ function initSafeQMSEngine() {
 
     const pages: Record<string, () => string> = {
       overview,
+      daily: dailyBoard,
+      myfocus: myFocus,
       pillars,
       cascade,
       iso: isoPage,
@@ -3143,6 +3487,260 @@ function initSafeQMSEngine() {
     save();
     return r;
   }
+  (window as any).setDailyTier = (t: string) => { S.dailyTier = t; save(); render(); };
+  (window as any).focusUnitDaily = (unit: string) => {
+    const allowedScopes = limitedRole() ? ['Organization', ASSIGNED_SITE, ASSIGNED_DEPARTMENT] : ['Organization', 'Site: Uppsala', 'Site: Falkenberg', 'Department: Production', 'Department: Maintenance', 'Department: Quality'];
+    if (allowedScopes.includes(unit)) S.scope = unit;
+    S.dailyTier = 'tier1';
+    save();
+    render();
+  };
+  (window as any).setMyFocusOwner = (o: string) => { S.myFocusOwner = o; save(); render(); };
+  (window as any).toggleSafetyDay = (scopeKey: string, day: number) => {
+    if (isAuditor()) return toast('Read-only role cannot update Safety Cross');
+    if (!S.safetyCross) S.safetyCross = {};
+    if (!S.safetyCross[scopeKey]) S.safetyCross[scopeKey] = {};
+    const cur = S.safetyCross[scopeKey][String(day)] || '';
+    const next = cur === '' ? 'green' : cur === 'green' ? 'amber' : cur === 'amber' ? 'red' : '';
+    if (next) S.safetyCross[scopeKey][String(day)] = next;
+    else delete S.safetyCross[scopeKey][String(day)];
+    save();
+    render();
+  };
+  (window as any).createPulseCard = (ev: any) => {
+    ev.preventDefault();
+    if (isAuditor()) return toast('Read-only role cannot add pulse cards');
+    const d = Object.fromEntries(new FormData(ev.target)) as any;
+    if (!String(d.title || '').trim()) return;
+    if (!Array.isArray(S.pulseCards)) S.pulseCards = [];
+    const n = Math.max(0, ...S.pulseCards.map((c: any) => Number(String(c.id).split('-')[1]) || 0)) + 1;
+    const id = 'PC-' + String(n).padStart(3, '0');
+    const linkedKpiId = d.kpi || '';
+    const matchedGoal = linkedKpiId ? S.goals.find((g: any) => g.kpi === linkedKpiId && visibleToRole(g)) : null;
+    const matchedInit = matchedGoal ? S.initiatives.find((i: any) => initiativeLinkedToGoal(i, matchedGoal.id)) : null;
+    const matchedProj = matchedInit ? S.projects.find((p: any) => p.initiative === matchedInit.id) : null;
+    let blockerId = '';
+    let status = 'Team action';
+    if (d.routeType === 'Escalate' && !isAuditor()) {
+      if (!Array.isArray(S.blockers)) S.blockers = [];
+      const bn = Math.max(0, ...S.blockers.map((b: any) => Number(String(b.id).split('-')[1]) || 0)) + 1;
+      blockerId = 'BL-' + String(bn).padStart(3, '0');
+      const targetType = matchedInit ? 'initiative' : linkedKpiId ? 'kpi' : 'goal';
+      const targetId = matchedInit?.id || linkedKpiId || matchedGoal?.id || 'G-002';
+      S.blockers.unshift({
+        id: blockerId, targetType, targetId, scope: S.scope,
+        category: 'Technical', severity: 'High',
+        summary: String(d.title).trim(),
+        neededAction: 'Review escalated Tier 1 daily board issue in Tier 2 / PDCA meeting.',
+        owner: d.owner || role(), raisedBy: role(), raisedAt: today,
+        status: 'Open', source: 'Daily Board'
+      });
+      status = 'Escalated';
+    }
+    S.pulseCards.unshift({
+      id, title: String(d.title).trim(), details: '', due: '', scope: S.scope, routeType: d.routeType || 'Direct fix',
+      owner: d.owner || role(), kpi: linkedKpiId, initiative: matchedInit?.id || '', project: matchedProj?.id || '',
+      blockerId, status, createdAt: today, comments: []
+    });
+    save();
+    render();
+    toast(blockerId ? `Added ${id} and escalated ${blockerId} to PDCA queue` : `Added ${id} to Daily Board`);
+  };
+  (window as any).openPulseCard = (pcId: string, ev?: any) => {
+    if (ev && (ev.target as HTMLElement)?.closest('button,form,input,select,textarea,a')) return;
+    pulseOpenCardId = pcId;
+    render();
+  };
+  (window as any).openPulseCardFromFocus = (pcId: string) => {
+    go('daily');
+    pulseOpenCardId = pcId;
+    render();
+  };
+  (window as any).closePulseCard = () => {
+    pulseOpenCardId = null;
+    render();
+  };
+  (window as any).savePulseCardDetails = (ev: any, pcId: string) => {
+    ev.preventDefault();
+    if (isAuditor()) return toast('Read-only role cannot edit pulse cards');
+    const c = (S.pulseCards || []).find((x: any) => x.id === pcId);
+    if (!c) return;
+    const d = Object.fromEntries(new FormData(ev.target)) as any;
+    if (String(d.title || '').trim()) c.title = String(d.title).trim();
+    c.details = String(d.details || '').trim();
+    c.due = String(d.due || '').trim();
+    if (d.routeType) c.routeType = d.routeType;
+    const linkedKpiId = d.kpi || '';
+    c.kpi = linkedKpiId;
+    const matchedGoal = linkedKpiId ? S.goals.find((g: any) => g.kpi === linkedKpiId && visibleToRole(g)) : null;
+    const matchedInit = matchedGoal ? S.initiatives.find((i: any) => initiativeLinkedToGoal(i, matchedGoal.id)) : null;
+    const matchedProj = matchedInit ? S.projects.find((p: any) => p.initiative === matchedInit.id) : null;
+    if (matchedInit) c.initiative = matchedInit.id;
+    else if (!linkedKpiId) c.initiative = '';
+    if (matchedProj) c.project = matchedProj.id;
+    else if (!linkedKpiId) c.project = '';
+    if (c.blockerId) {
+      const b = (S.blockers || []).find((x: any) => x.id === c.blockerId);
+      if (b) {
+        b.summary = c.title;
+        b.targetType = c.initiative ? 'initiative' : c.kpi ? 'kpi' : 'goal';
+        b.targetId = c.initiative || c.kpi || matchedGoal?.id || b.targetId;
+      }
+    }
+    save();
+    render();
+    toast(`Saved ${c.id} details`);
+  };
+  (window as any).addPulseCardComment = (ev: any, pcId: string) => {
+    ev.preventDefault();
+    if (isAuditor()) return toast('Read-only role cannot post comments');
+    const c = (S.pulseCards || []).find((x: any) => x.id === pcId);
+    if (!c) return;
+    const d = Object.fromEntries(new FormData(ev.target)) as any;
+    const text = String(d.text || '').trim();
+    if (!text) return;
+    if (!Array.isArray(c.comments)) c.comments = [];
+    c.comments.push({ by: role(), at: today, text });
+    save();
+    render();
+    toast('Added note to card');
+  };
+  (window as any).openPulseDelegate = (pcId: string) => {
+    if (isAuditor()) return toast('Read-only role cannot delegate pulse cards');
+    pulseDelegateCardId = pulseDelegateCardId === pcId ? null : pcId;
+    render();
+  };
+  (window as any).closePulseDelegate = () => {
+    pulseDelegateCardId = null;
+    render();
+  };
+  (window as any).delegatePulseCard = (ev: any, pcId: string) => {
+    ev.preventDefault();
+    if (isAuditor()) return toast('Read-only role cannot delegate pulse cards');
+    const c = (S.pulseCards || []).find((x: any) => x.id === pcId);
+    if (!c) return;
+    const d = Object.fromEntries(new FormData(ev.target)) as any;
+    const targetScope = d.scope || c.scope;
+    const targetOwner = String(d.owner || c.owner || role()).trim();
+    const note = String(d.note || '').trim();
+    c.scope = targetScope;
+    c.owner = targetOwner;
+    c.status = 'Team action';
+    c.delegatedBy = role();
+    c.delegatedAt = today;
+    if (note) c.delegationNote = note;
+    else delete c.delegationNote;
+    if (!Array.isArray(c.comments)) c.comments = [];
+    c.comments.push({ by: role(), at: today, text: `↳ Delegated to ${targetOwner} (${targetScope})${note ? ': ' + note : ''}` });
+    if (c.blockerId) {
+      const b = (S.blockers || []).find((x: any) => x.id === c.blockerId);
+      if (b) {
+        b.scope = targetScope;
+        b.owner = targetOwner;
+        b.status = 'In review';
+        delete b.resolvedAt;
+        b.neededAction = note ? `Delegated by ${role()} to ${targetOwner} (${targetScope}): ${note}` : `Delegated by ${role()} to ${targetOwner} (${targetScope})`;
+        if (b.reviewId && typeof b.decisionIndex === 'number') {
+          const dec = S.reviews.find((r: any) => r.id === b.reviewId)?.decisions?.[b.decisionIndex];
+          if (dec) dec.status = 'Open';
+        }
+      }
+    }
+    pulseDelegateCardId = null;
+    S.history.unshift({ time: today, text: `${c.id} delegated by ${role()} to ${targetOwner} (${targetScope}): ${c.title}` });
+    save();
+    render();
+    toast(`Delegated ${c.id} to ${targetOwner} (${targetScope})`);
+  };
+  (window as any).escalatePulseCard = (pcId: string) => {
+    if (isAuditor()) return toast('Read-only role cannot escalate pulse cards');
+    const c = (S.pulseCards || []).find((x: any) => x.id === pcId);
+    if (!c) return;
+    c.status = 'Escalated';
+    c.routeType = 'Escalate';
+    if (!Array.isArray(c.comments)) c.comments = [];
+    if (!c.blockerId) {
+      if (!Array.isArray(S.blockers)) S.blockers = [];
+      const bn = Math.max(0, ...S.blockers.map((b: any) => Number(String(b.id).split('-')[1]) || 0)) + 1;
+      const blockerId = 'BL-' + String(bn).padStart(3, '0');
+      const targetType = c.initiative ? 'initiative' : c.kpi ? 'kpi' : 'goal';
+      const targetId = c.initiative || c.kpi || S.goals.find((g: any) => g.level === c.scope)?.id || 'G-002';
+      S.blockers.unshift({
+        id: blockerId, targetType, targetId, scope: c.scope,
+        category: 'Cross-functional', severity: 'High',
+        summary: c.title,
+        neededAction: 'Escalated from Daily Tier 1 Pulse Board for Tier 2/3 leadership support.',
+        owner: c.owner || role(), raisedBy: role(), raisedAt: today,
+        status: 'Open', source: 'Daily Board'
+      });
+      c.blockerId = blockerId;
+      c.comments.push({ by: role(), at: today, text: `↑ Escalated to Tier 2/3 & PDCA Queue as ${blockerId}` });
+      S.history.unshift({ time: today, text: `${blockerId} escalated from Daily Board (${c.id}): ${c.title}` });
+    } else {
+      const b = (S.blockers || []).find((x: any) => x.id === c.blockerId);
+      if (b) {
+        b.status = b.reviewId ? 'In review' : 'Open';
+        b.raisedBy = role();
+        b.raisedAt = today;
+        delete b.resolvedAt;
+        if (b.reviewId && typeof b.decisionIndex === 'number') {
+          const dec = S.reviews.find((r: any) => r.id === b.reviewId)?.decisions?.[b.decisionIndex];
+          if (dec) dec.status = 'Open';
+        }
+      }
+      c.comments.push({ by: role(), at: today, text: `↑ Re-escalated to Tier 2/3 (${c.blockerId})` });
+      S.history.unshift({ time: today, text: `${c.blockerId} re-escalated from Daily Board (${c.id}): ${c.title}` });
+    }
+    pulseDelegateCardId = null;
+    save();
+    render();
+    toast(`Escalated ${c.id} as ${c.blockerId} to Tier 2/3 & PDCA queue`);
+  };
+  (window as any).togglePulseCardDone = (pcId: string) => {
+    if (isAuditor()) return toast('Read-only role cannot update pulse cards');
+    const c = (S.pulseCards || []).find((x: any) => x.id === pcId);
+    if (!c) return;
+    const nextDone = c.status !== 'Done';
+    c.status = nextDone ? 'Done' : (c.blockerId ? (c.delegatedBy ? 'Team action' : 'Escalated') : 'Team action');
+    if (!Array.isArray(c.comments)) c.comments = [];
+    c.comments.push({ by: role(), at: today, text: nextDone ? '✓ Marked Done' : 'Reopened card' });
+    if (c.blockerId) {
+      const b = (S.blockers || []).find((x: any) => x.id === c.blockerId);
+      if (b) {
+        if (nextDone) {
+          b.status = 'Resolved';
+          b.resolvedAt = today;
+          b.resolutionNote = b.resolutionNote || `Closed via Daily Board (${c.id})`;
+          if (b.reviewId && typeof b.decisionIndex === 'number') {
+            const dec = S.reviews.find((r: any) => r.id === b.reviewId)?.decisions?.[b.decisionIndex];
+            if (dec) dec.status = 'Done';
+          }
+        } else {
+          b.status = b.reviewId ? 'In review' : 'Open';
+          delete b.resolvedAt;
+          if (b.reviewId && typeof b.decisionIndex === 'number') {
+            const dec = S.reviews.find((r: any) => r.id === b.reviewId)?.decisions?.[b.decisionIndex];
+            if (dec) dec.status = 'Open';
+          }
+        }
+      }
+    }
+    save();
+    render();
+    toast(nextDone ? `${c.id} completed` : `${c.id} reopened`);
+  };
+  (window as any).toggleDailyTask = (taskId: string) => {
+    const t = (S.tasks || []).find((x: any) => x.id === taskId);
+    const p = t ? S.projects.find((x: any) => x.id === t.project) : null;
+    if (!t || !p || isAuditor()) return toast('Cannot update task in read-only role');
+    if (isBasic() && !roleCan('taskOwn', t)) return toast('Basic user can only update tasks assigned to Team Leader');
+    if (!isBasic() && !roleCan('projectWrite', p)) return toast('Your role cannot update tasks on this project');
+    t.status = t.status === 'Open' ? 'In progress' : t.status === 'In progress' ? 'Done' : 'Open';
+    syncExecutionProgress(p.id);
+    save();
+    render();
+    toast(`Task ${t.id} marked ${t.status}; project & initiative progress synced`);
+  };
   (window as any).convertToPdcaDecision = async (blockerId: string, targetType: string, targetId: string) => {
     if (!roleCan('reviewWrite')) return toast('Only management or department directors can log PDCA decisions');
     const b = blockerId ? (S.blockers || []).find((x: any) => x.id === blockerId) : null;

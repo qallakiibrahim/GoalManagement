@@ -49,14 +49,15 @@ Problemet i många företag är att de fina orden fastnar i en PowerPoint – in
 - **☀ Light / ☾ Dark:** Växlar mellan mörkt tema (standard) och ljust tema. Ditt val sparas automatiskt i webbläsaren. *(Tips: När du skriver ut eller sparar som PDF blir sidorna alltid rena och vita på papperet automatiskt!)*
 
 ### Sidomenyn (till vänster)
-Appen är uppdelad i 6 tydliga huvudområden:
+Appen är uppdelad i 7 tydliga huvudområden:
 1. **▦ Overview** – Din startpanel med det viktigaste just nu.
-2. **⑂ Strategy & Goals** – Huvudmål, Målträd, 360° X-Matris och Strategy A3.
-3. **▤ Initiatives & Projects** – Förbättringsinitiativ, SQDC-prioritering, Projekt A3 och aktiviteter.
-4. **▥ Performance** – Månadsgrafer, Bowling Chart och CSV/Excel-import.
-5. **⟳ Reviews & Alignment** – Catchball-dialog, PDCA-möten med avvikelsekö och Formella godkännanden.
-6. **▣ ISO & Evidence** – ISO-kravuppfyllelse, Audit Evidence Pack och underlag till Ledningens genomgång.
-7. **⚙ Admin / Demo Settings** *(visas endast för Administratör)* – Återställ demo, ladda synkat demo, exportera all data som JSON eller se teknisk API-ritning.
+2. **◫ Daily Board** – Daglig styrning i tre nivåer (**Tier 1–3 Pulse Board** med Safety Cross & Pulse Cards) samt personlig vy (**My Focus**).
+3. **⑂ Strategy & Goals** – Huvudmål, Målträd, 360° X-Matris och Strategy A3.
+4. **▤ Initiatives & Projects** – Förbättringsinitiativ, SQDC-prioritering, Projekt A3 och aktiviteter.
+5. **▥ Performance** – Månadsgrafer, Bowling Chart och CSV/Excel-import.
+6. **⟳ Reviews & Alignment** – Catchball-dialog, PDCA-möten med avvikelsekö och Formella godkännanden.
+7. **▣ ISO & Evidence** – ISO-kravuppfyllelse, Audit Evidence Pack och underlag till Ledningens genomgång.
+8. **⚙ Admin / Demo Settings** *(visas endast för Administratör)* – Återställ demo, ladda synkat demo, exportera all data som JSON eller se teknisk API-ritning.
 
 ### Scope- och Årslisten (på flera sidor)
 Högst upp på sidor som *Overview, Goal Cascade, X-Matrix, Strategy A3, PDCA Reviews* och *ISO/Evidence* finns två filter:
@@ -94,6 +95,30 @@ Startsidan ger dig lägesbilden på 5 sekunder:
 - **Management Attention · Exceptions:** Visar röda KPI-signaler (`⚠`), eskalerade hinder (`⚑`) och mål som väntar på godkännande (`◷`).
 - **Strategy-to-execution flow:** Visuell kedja som påminner om hela flödet.
 - **Catchball & General director decision feed:** Snabbgenväg till pågående målförhandlingar samt beslutshistorik för VD.
+
+---
+
+### 4.1B Daily Board & My Focus (Daglig Styrning & Personlig Vy)
+
+#### A. Tier 1–3 Pulse Board (`daily`)
+En enkel men kraftfull mötestavla för daglig styrning i tre steg – helt synkad med resten av appen:
+- **Tier 1 · Team Pulse (Morgon-/skiftmöte):**
+  - **Safety & Quality Cross:** Visuellt 31-dagarskors. Klicka på en dag för att växla mellan **Grön (OK)**, **Gul (Near-miss)** och **Röd (Incident)**.
+  - **Live KPI Pulse:** Visar senaste utfall mot målvärde för det valda scopet.
+  - **Daily Pulse & Kaizen Cards (Kanban):** Lägg till ett problem eller förbättringsförslag på 10 sekunder och välj väg: *Direct fix*, *Needs Root Cause (A3)* eller *Escalate ↑ (Tier 2/3)*.
+    - **Klicka på valfritt Kanban-kort (`Open ↗`):** Öppnar kortets detaljvy med problembeskrivning, deadline, länkad KPI/Initiativ/A3/Blocker, full **↑ Escalate / ↳ Delegate**-styrning och möteslogg/kommentarer.
+    - **↑ Escalate:** Lyft ett teamärende upp till Tier 2/3 & PDCA-kön.
+    - **↳ Delegate:** Skicka eller delegera tillbaka ett kort (även från `Escalated`) till valfri avdelning/anläggning och ansvarig med en kort instruktion – då hamnar kortet direkt i mottagarens teamkolumn och under deras **My Focus**.
+  - **Active Team Tasks:** Klicka direkt på en uppgifts statusbricka (`Open` → `In progress` → `Done`) vid tavlan så räknas projektets och initiativets framsteg upp automatiskt.
+- **Tier 2 · Site & Dept Scorecard:** Rullar automatiskt ihop målstatus, öppna pulskort och eskalerade hinder per anläggning och avdelning (Uppsala, Falkenberg, Production, Maintenance, Quality).
+- **Tier 3 · Management Obeya:** Samlar eskalerade pulskort, manuella hinder och röda/riskfyllda KPI-avvikelser på ett ställe för ledningsbeslut – och ledningen kan därifrån delegera kort vidare till rätt team.
+- **Sluten synk:** Eskalerar du ett pulskort (`↑ Escalate`) skapas automatiskt en riktig Blocker i **PDCA Reviews**. När blockern eller PDCA-beslutet stängs flyttas pulskortet automatiskt till **Done** (och vice versa).
+
+#### B. My Focus · Personal Obeya (`myfocus`)
+En personlig vy där varje ansvarig (eller chef som växlar person i rullistan) ser **bara sitt eget**:
+- Dina tilldelade **KPI:er från X-Matrisens SE-vinge** (`● Primary` eller `○ Support`).
+- Dina **Mål & Catchball-ärenden** som väntar på ditt svar.
+- Dina **Initiativ**, **Öppna aktiviteter** (1-klicksstatus), **Delegerade/egna Kanban-kort** och **Öppna PDCA-beslut**.
 
 ---
 
