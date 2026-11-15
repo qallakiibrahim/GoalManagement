@@ -527,7 +527,7 @@ function initSafeQMSEngine() {
       },
       {
         id: 'G-007', title: 'Improve safety action closure', level: 'Site: Uppsala', parent: 'G-008', owner: 'EHS Manager', year: '2027',
-        kpi: 'K-006', baseline: 82, target: 95, unit: '%', status: 'Active', approval: 'Approved', performance: 'At risk',
+        kpi: 'K-006', baseline: 82, target: 95, unit: '%', status: 'Active', approval: 'Pending', performance: 'At risk',
         iso: 'ISO 45001 · 6.2', description: 'Close safety audit and near-miss corrective actions on time.',
         planWhat: 'Implement digital Gemba safety walks and daily visual safety huddles.', resources: 'EHS team and department safety representatives',
         planDue: '2027-12-31', evaluation: 'Weekly safety action tracker and monthly EHS committee review', isoRefs: ['req-45001-6.2'],
@@ -760,7 +760,8 @@ function initSafeQMSEngine() {
       { kpi: 'K-007', owner: 'Quality Manager', strength: 2, note: 'Primary owner for First-Time-Right yield & vision gates' },
       { kpi: 'K-007', owner: 'Production Manager', strength: 1, note: 'Standard work adherence on packaging lines' },
       { kpi: 'K-008', owner: 'EHS Manager', strength: 2, note: 'Primary owner for 7-day near-miss resolution' },
-      { kpi: 'K-008', owner: 'Maintenance Manager', strength: 1, note: 'Supports mechanical/ergonomic hazard remediation' }
+      { kpi: 'K-008', owner: 'Maintenance Manager', strength: 1, note: 'Supports mechanical/ergonomic hazard remediation' },
+      { kpi: 'K-008', owner: 'Safety Coordinator', strength: 1, note: 'Shopfloor hazard & 7-day near-miss follow-up coordinator' }
     ],
     history: [
       { time: '2027-01-10', text: 'Organization strategy approved (rev 1)' },
@@ -933,6 +934,13 @@ function initSafeQMSEngine() {
     }
     if (!Array.isArray(S.kpiOwners)) {
       S.kpiOwners = JSON.parse(JSON.stringify(seed().kpiOwners));
+    } else if (!S.kpiOwners.some((r: any) => r.owner === 'Safety Coordinator') && S.goals?.some((g: any) => g.id === 'G-014' && g.owner === 'Safety Coordinator')) {
+      S.kpiOwners.push({ kpi: 'K-008', owner: 'Safety Coordinator', strength: 1, note: 'Shopfloor hazard & 7-day near-miss follow-up coordinator' });
+    }
+    const ap001 = S.approvals?.find((a: any) => a.id === 'AP-001' && a.goal === 'G-007' && a.status === 'Pending');
+    const g007 = S.goals?.find((g: any) => g.id === 'G-007');
+    if (ap001 && g007 && (g007.revision || 1) === 1 && g007.approval === 'Approved') {
+      g007.approval = 'Pending';
     }
     for (const k of S.kpis) if (!k.source) k.source = 'Demo / manually entered';
     for (const g of S.goals) {
@@ -1166,7 +1174,7 @@ function initSafeQMSEngine() {
   function roleVisibleGoals() {
     let gs = S.goals.filter(visibleToRole);
     if (S.scope === 'Organization') return gs;
-    return gs.filter((g: any) => g.level === 'Organization' || g.level === S.scope || (S.scope.startsWith('Department:') && g.level === ASSIGNED_SITE));
+    return gs.filter((g: any) => g.level === 'Organization' || xm4ScopeIncludes(g));
   }
 
   function roleScopebar() {
@@ -1191,7 +1199,15 @@ function initSafeQMSEngine() {
     if (/cycleLink\(/.test(x)) return roleCan('matrixEdit');
     if (/go\('goal'/.test(x)) return true;
     if (/focusParent\(/.test(x)) { let id = (x.match(/'(G-[^']+)'/) || [])[1]; return roleCan('goalEdit', goal(id)); }
-    if (/saveProjectA3\(|addTask\(/.test(x)) return roleCan('projectWrite');
+    if (/saveProjectA3\(|addTask\(/.test(x)) {
+      let pid = (x.match(/'(P-[^']+)'/) || [])[1];
+      return roleCan('projectWrite', pid ? S.projects.find((p: any) => p.id === pid) : undefined);
+    }
+    if (/toggleTaskStatus\(/.test(x)) {
+      let tid = (x.match(/'(T-[^']+)'/) || [])[1];
+      let t = tid ? (S.tasks || []).find((y: any) => y.id === tid) : null;
+      return roleCan('projectWrite', t ? S.projects.find((p: any) => p.id === t.project) : undefined);
+    }
     if (/recordKPI\(/.test(x)) { let id = (x.match(/'(K-[^']+)'/) || [])[1]; return roleCan('kpiWrite', kpi(id)); }
     if (/prepareManagementReview\(/.test(x)) return roleCan('reviewPrepare');
     if (/escalateBlocker\(/.test(x)) {
@@ -1315,6 +1331,55 @@ function initSafeQMSEngine() {
     let gap = direction === 'lower' ? target - actual : direction === 'range' ? -Math.abs(actual - target) : actual - target;
     let label = gap >= 0 ? 'On track' : gap >= -tolerance ? 'At risk' : 'Off track';
     return { label, gap, actual, target, month: n, unit: k.unit, direction, tolerance };
+  }
+
+  function initiativeLinkedToGoal(i: any, goalId: string) {
+    return i?.goal === goalId || S.relations.some((r: any) => r.from === goalId && r.to === i?.id && r.strength > 0);
+  }
+
+  function syncKpiTargetsFromGoal(g: any) {
+    const k = kpi(g?.kpi);
+    if (!k || !Number.isFinite(Number(g?.target))) return;
+    const hasMoreSpecificGoal = g.level === 'Organization' && S.goals.some((x: any) => x.id !== g.id && x.level !== 'Organization' && x.kpi === g.kpi);
+    if (hasMoreSpecificGoal) return;
+    if (!Array.isArray(k.targets)) k.targets = [];
+    while (k.targets.length < 12) k.targets.push(Number(g.target));
+    let lastIdx = -1;
+    if (Array.isArray(k.values)) {
+      for (let i = k.values.length - 1; i >= 0; i--) {
+        if (k.values[i] !== null && k.values[i] !== undefined && Number.isFinite(Number(k.values[i]))) {
+          lastIdx = i;
+          break;
+        }
+      }
+    }
+    const startIdx = lastIdx >= 0 ? lastIdx : 0;
+    for (let i = startIdx; i < 12; i++) k.targets[i] = Number(g.target);
+  }
+
+  function syncExecutionProgress(projectId?: string) {
+    const projectsToSync = projectId ? S.projects.filter((p: any) => p.id === projectId) : S.projects;
+    const touchedInitiatives = new Set<string>();
+    for (const p of projectsToSync) {
+      const ts = (S.tasks || []).filter((t: any) => t.project === p.id);
+      if (ts.length) {
+        const score = ts.reduce((acc: number, t: any) => acc + (t.status === 'Done' ? 1 : t.status === 'In progress' ? 0.5 : 0), 0);
+        p.progress = Math.round((score / ts.length) * 100);
+        if (p.progress === 100 && p.status !== 'Completed') p.status = 'Completed';
+        else if (p.progress < 100 && p.status === 'Completed') p.status = 'On track';
+      }
+      if (p.initiative) touchedInitiatives.add(p.initiative);
+    }
+    for (const initId of touchedInitiatives) {
+      const i = initiative(initId);
+      if (!i) continue;
+      const ps = (S.projects || []).filter((p: any) => p.initiative === initId);
+      if (ps.length) {
+        i.progress = Math.round(ps.reduce((sum: number, p: any) => sum + Number(p.progress || 0), 0) / ps.length);
+        if (i.progress === 100 && i.status !== 'Completed') i.status = 'Completed';
+        else if (i.progress < 100 && i.status === 'Completed') i.status = 'On track';
+      }
+    }
   }
 
   function syncGoalPerformance() {
@@ -1587,7 +1652,7 @@ function initSafeQMSEngine() {
   function overview() {
     let vg = roleVisibleGoals(), open = isBasic() ? 0 : S.approvals.filter((a: any) => a.status === 'Pending' && visibleToRole(goal(a.goal))).length;
     const exceptions = pdcaExceptionQueue(S.scope, true);
-    const openBlockers = (S.blockers || []).filter((b: any) => b.status !== 'Resolved' && blockerAllowedByRole(b));
+    const openBlockers = (S.blockers || []).filter((b: any) => b.status !== 'Resolved' && blockerAllowedByRole(b) && blockerMatchesScope(b.scope, S.scope));
     const attentionRows = [
       ...exceptions.slice(0, 4).map((e: any) => {
         const info = blockerTargetInfo(e.targetType, e.targetId);
@@ -1631,18 +1696,20 @@ function initSafeQMSEngine() {
   }
 
   function cascade() {
+    const scopedIds = new Set<string>(roleVisibleGoals().map((x: any) => String(x.id)));
     let roots = S.goals.filter((g: any) => !g.parent && visibleToRole(g)), top = roots.filter((g: any) => g.level === 'Organization');
+    let scopedGoals = S.goals.filter((g: any) => visibleToRole(g) && (S.scope === 'Organization' || scopedIds.has(g.id)));
     let controls = `<div class="hierarchy-bar"><b>View</b>${btn('Hierarchy', "window.setCascadeView('tree')", S.cascadeView === 'tree' ? 'teal' : '')}${btn('Table', "window.setCascadeView('table')", S.cascadeView === 'table' ? 'teal' : '')}${S.cascadeView === 'tree' ? btn('Expand all', 'window.setCollapsed(false)') + btn('Collapse all', 'window.setCollapsed(true)') : ''}${btn('Manage Main Goals', "go('pillars')")}</div>`;
-    let content = S.cascadeView === 'tree' ? `<div class="grid2"><div>${top.map((g: any) => node(g, 0)).join('')}</div><div class="tile"><h3>Strategy Deployment</h3><p>Click a goal title to edit it. Use <b>Change parent</b> to move a goal under a different approved strategic parent. Child objectives follow their parent automatically.</p><div class="minirow">Organization pillars: <b>${top.length}</b></div><div class="minirow">Site objectives: <b>${S.goals.filter((g: any) => visibleToRole(g) && g.level.startsWith('Site')).length}</b></div><div class="minirow">Department objectives: <b>${S.goals.filter((g: any) => visibleToRole(g) && g.level.startsWith('Department')).length}</b></div><div class="minirow">Unlinked goals: <b>${S.goals.filter((g: any) => visibleToRole(g) && g.level !== 'Organization' && !g.parent).length}</b></div><p class="small muted" style="margin-top:12px">Hierarchy links are authoritative; X-Matrix correlations are separate supporting relationships.</p></div></div>${roots.filter((g: any) => g.level !== 'Organization').length ? panel('Unlinked objectives – require a parent', roots.filter((g: any) => g.level !== 'Organization').map((g: any) => node(g, 0)).join('')) : ''}` :
-      table(['Goal', 'Primary parent', 'Level', 'Performance', 'Actions'], S.goals.filter(visibleToRole).map((g: any) => `<tr><td><b>${esc(g.title)}</b><div class="xs muted">${g.id}</div></td><td>${esc(goal(g.parent)?.title || 'No parent')}</td><td>${esc(g.level)}</td><td>${badge(g.performance)}</td><td><div class="actions">${btn('Edit', `go('goal','${g.id}')`)}${g.level !== 'Organization' ? btn('Change parent', `window.focusParent('${g.id}')`) : ''}</div></td></tr>`));
+    let content = S.cascadeView === 'tree' ? `<div class="grid2"><div>${top.map((g: any) => node(g, 0, scopedIds)).join('')}</div><div class="tile"><h3>Strategy Deployment</h3><p>Click a goal title to edit it. Use <b>Change parent</b> to move a goal under a different approved strategic parent. Child objectives follow their parent automatically.</p><div class="minirow">Organization pillars: <b>${top.length}</b></div><div class="minirow">Site objectives: <b>${scopedGoals.filter((g: any) => g.level.startsWith('Site')).length}</b></div><div class="minirow">Department objectives: <b>${scopedGoals.filter((g: any) => g.level.startsWith('Department')).length}</b></div><div class="minirow">Unlinked goals: <b>${scopedGoals.filter((g: any) => g.level !== 'Organization' && !g.parent).length}</b></div><p class="small muted" style="margin-top:12px">Hierarchy links are authoritative; X-Matrix correlations are separate supporting relationships.</p></div></div>${roots.filter((g: any) => g.level !== 'Organization' && (S.scope === 'Organization' || scopedIds.has(g.id))).length ? panel('Unlinked objectives – require a parent', roots.filter((g: any) => g.level !== 'Organization' && (S.scope === 'Organization' || scopedIds.has(g.id))).map((g: any) => node(g, 0, scopedIds)).join('')) : ''}` :
+      table(['Goal', 'Primary parent', 'Level', 'Performance', 'Actions'], scopedGoals.map((g: any) => `<tr><td><b>${esc(g.title)}</b><div class="xs muted">${g.id}</div></td><td>${esc(goal(g.parent)?.title || 'No parent')}</td><td>${esc(g.level)}</td><td>${badge(g.performance)}</td><td><div class="actions">${btn('Edit', `go('goal','${g.id}')`)}${g.level !== 'Organization' ? btn('Change parent', `window.focusParent('${g.id}')`) : ''}</div></td></tr>`));
     return head('Goal Cascade', 'Interactive hierarchy · editable primary parent · no duplicate records', btn('+ Create Goal', "go('newgoal')", 'primary')) + roleScopebar() +
       `<div class="banner"><b>Quick tip:</b> edit the top-level headings under <b>Main Strategic Goals</b>. To change an annual or department goal's parent, click <b>Change parent</b>. Cyclic links are blocked.</div>` +
       controls + panel('Organization → Site → Department', content);
   }
 
-  function node(g: any, depth: number): string {
-    let kids = S.goals.filter((x: any) => x.parent === g.id && visibleToRole(x)), collapsed = S.collapsed.includes(g.id);
-    return `<div class="treeitem ${depth ? 'branch' : ''}"><div class="node"><div class="topline"><div><div class="nodeactions">${kids.length ? `<button class="tinybtn" title="Expand/collapse" onclick="window.toggleCollapse('${g.id}')">${collapsed ? '▸' : '▾'} ${kids.length}</button>` : ''}<button class="titlelink" onclick="go('goal','${g.id}')">${esc(g.title)}</button></div><div class="xs muted">${g.id} · ${esc(g.level)} · ${esc(g.owner)}</div></div>${badge(g.performance)}</div><div class="split" style="margin-top:8px"><div class="xs muted">${esc(g.iso)} · ${esc(g.approval)}</div><div class="nodeactions">${btn('Edit', `go('goal','${g.id}')`)}${g.level !== 'Organization' ? btn('Change parent', `window.focusParent('${g.id}')`) : ''}</div></div></div>${!collapsed ? kids.map((k: any) => node(k, depth + 1)).join('') : ''}</div>`;
+  function node(g: any, depth: number, scopedIds?: Set<string>): string {
+    let kids = S.goals.filter((x: any) => x.parent === g.id && visibleToRole(x) && (!scopedIds || S.scope === 'Organization' || scopedIds.has(x.id))), collapsed = S.collapsed.includes(g.id);
+    return `<div class="treeitem ${depth ? 'branch' : ''}"><div class="node"><div class="topline"><div><div class="nodeactions">${kids.length ? `<button class="tinybtn" title="Expand/collapse" onclick="window.toggleCollapse('${g.id}')">${collapsed ? '▸' : '▾'} ${kids.length}</button>` : ''}<button class="titlelink" onclick="go('goal','${g.id}')">${esc(g.title)}</button></div><div class="xs muted">${g.id} · ${esc(g.level)} · ${esc(g.owner)}</div></div>${badge(g.performance)}</div><div class="split" style="margin-top:8px"><div class="xs muted">${esc(g.iso)} · ${esc(g.approval)}</div><div class="nodeactions">${btn('Edit', `go('goal','${g.id}')`)}${g.level !== 'Organization' ? btn('Change parent', `window.focusParent('${g.id}')`) : ''}</div></div></div>${!collapsed ? kids.map((k: any) => node(k, depth + 1, scopedIds)).join('') : ''}</div>`;
   }
 
   function permittedParents(level: string, id: string) {
@@ -1739,7 +1806,7 @@ function initSafeQMSEngine() {
       (S.scope === 'Organization' || representedRoots.has(g.id)));
     const annualIDs = new Set(annual.map((g: any) => g.id));
     const initiatives = S.initiatives.filter((i: any) => visibleInitiative(i) &&
-      (S.scope === 'Organization' || annualIDs.has(i.goal) || S.relations.some((r: any) => r.to === i.id && annualIDs.has(r.from))));
+      (S.scope === 'Organization' || annual.some((g: any) => initiativeLinkedToGoal(i, g.id))));
     const linkedKpiIds = new Set([...annual.map((g: any) => g.kpi).filter(Boolean), ...S.relations.filter((r: any) => initiatives.some((i: any) => i.id === r.from) && r.to.startsWith('K-')).map((r: any) => r.to)]);
     // Organization view has all KPI definitions as well, including those not yet linked.
     const kpis = S.kpis.filter((k: any) => (S.scope === 'Organization' && !limitedRole()) || linkedKpiIds.has(k.id));
@@ -1857,11 +1924,12 @@ function initSafeQMSEngine() {
     }).join('');
   }
 
-  function xm3OwnersRows(owners: any[], selection: any, chain: any) {
+  function xm3OwnersRows(owners: any[], selection: any, chain: any, dataKpis: any[] = []) {
+    const kpiIds = new Set(dataKpis.map((k: any) => k.id));
     return owners.map((o: any, i: number) => {
       const initials = o.name.split(' ').filter(Boolean).map((x: string) => x[0]).slice(0, 2).join('').toUpperCase();
-      const priCount = (S.kpiOwners || []).filter((r: any) => r.owner === o.id && r.strength === 2).length;
-      const supCount = (S.kpiOwners || []).filter((r: any) => r.owner === o.id && r.strength === 1).length;
+      const priCount = (S.kpiOwners || []).filter((r: any) => r.owner === o.id && r.strength === 2 && kpiIds.has(r.kpi)).length;
+      const supCount = (S.kpiOwners || []).filter((r: any) => r.owner === o.id && r.strength === 1 && kpiIds.has(r.kpi)).length;
       return `<button type="button" class="xm3-label${xm3LabelClass('owner', o.id, selection, chain)}" title="${esc(o.name)} (${priCount} Primary · ${supCount} Support)" onclick="window.xm3Select('owner','${esc(o.id)}')"><span class="xm3-id xm3-id-owner">W${i + 1}</span><span class="xm3-name">${esc(o.name)}</span><span class="xs muted">${priCount}● ${supCount}○</span><span class="xm3-avatar xm3-avatar-owner" aria-hidden="true">${esc(initials)}</span></button>`;
     }).join('');
   }
@@ -2002,7 +2070,7 @@ function initSafeQMSEngine() {
     <div class="xm3-grid xm3-bl" aria-label="Corporate goals and annual hierarchy">${grid(d.org, d.annual, (g: any, a: any) => xm3RelCell(a.id, g.id, `${xm3Title(a)} → ${xm3Title(g)}`, sel, chain, true))}</div>
     <div class="xm3-bottomlist" aria-label="Corporate goals">${xm3Rows('corp', d.org, sel, chain)}</div>
     <div class="xm3-br-grid" aria-label="KPIs to Cross-Functional Owners matrix">${grid(d.owners, d.kpis, (o: any, k: any) => xm3OwnerRelCell(o.id, k, sel, chain))}</div>
-    <div class="xm3-ownerslist" aria-label="Cross-Functional Owners">${xm3OwnersRows(d.owners, sel, chain)}</div>
+    <div class="xm3-ownerslist" aria-label="Cross-Functional Owners">${xm3OwnersRows(d.owners, sel, chain, d.kpis)}</div>
     </div></div>${xm3Inspector(d, sel, chain)}`;
   }
 
@@ -2077,8 +2145,8 @@ function initSafeQMSEngine() {
     return head(i.title, `${id} · ${i.owner}`, btn('⚑ Escalate blocker', `window.escalateBlocker('initiative','${id}')`, 'primary') + btn('Back', "go('projects')")) +
       `<div class="cards" style="grid-template-columns:repeat(4,1fr)"><div class="card"><div class="label">Execution</div><div class="num">${i.progress}%</div></div><div class="card"><div class="label">Performance</div>${badge(i.status)}</div><div class="card"><div class="label">SQDC System Impact</div><div style="margin:6px 0">${sqdcStripHtml(i)}</div><div class="xs muted">${sc.pillars}/4 pillars · score ${sc.weighted}/8</div></div><div class="card"><div class="label">Primary goal</div><b>${esc(goal(i.goal)?.title || 'None')}</b></div></div>` +
       panel('Initiative details', `<p>${esc(i.description)}</p><p><b>Budget:</b> ${esc(i.budget)} · <b>Owner:</b> ${esc(i.owner)} · ${sqdcLeverageBadge(i)}</p><div class="actions">${btn('Open X-Matrix', "go('matrix')")}${btn('Open linked goal', `go('goal','${i.goal}')`)}${btn('PDCA Reviews', "go('reviews')")}</div>`) +
-      panel('SQDC Prioritization & Value Stream Bottleneck (Hoshin Plan Summary)',
-        `<form onsubmit="window.updateInitiativeFocus(event,'${id}')"><div class="formgrid">${field('Value Stream / Bottleneck Target', 'valueStream', i.valueStream || '')}${select('Relieves System Bottleneck (TOC)?', 'isBottleneck', [['true', 'Yes — Relieves TOC Bottleneck'], ['false', 'No — Supporting / Non-Bottleneck']], i.isBottleneck ? 'true' : 'false')}${select('Safety (S)', 'sqdcS', sqdcOpts, String(sc.s.S || 0))}${select('Quality (Q)', 'sqdcQ', sqdcOpts, String(sc.s.Q || 0))}${select('Delivery (D)', 'sqdcD', sqdcOpts, String(sc.s.D || 0))}${select('Cost (C)', 'sqdcC', sqdcOpts, String(sc.s.C || 0))}</div><div class="actions">${btn('Save SQDC & Value Stream', '', 'teal')}</div></form>`) +
+      panel('SQDC Prioritization, Execution & Value Stream Bottleneck (Hoshin Plan Summary)',
+        `<form id="initiativeFocusForm" onsubmit="window.updateInitiativeFocus(event,'${id}')"><div class="formgrid">${field('Progress %', 'progress', i.progress ?? 0, 'number', 'min="0" max="100"')}${select('Execution Status', 'status', ['Planned', 'On track', 'At risk', 'Completed'], i.status || 'Planned')}${field('Value Stream / Bottleneck Target', 'valueStream', i.valueStream || '')}${select('Relieves System Bottleneck (TOC)?', 'isBottleneck', [['true', 'Yes — Relieves TOC Bottleneck'], ['false', 'No — Supporting / Non-Bottleneck']], i.isBottleneck ? 'true' : 'false')}${select('Safety (S)', 'sqdcS', sqdcOpts, String(sc.s.S || 0))}${select('Quality (Q)', 'sqdcQ', sqdcOpts, String(sc.s.Q || 0))}${select('Delivery (D)', 'sqdcD', sqdcOpts, String(sc.s.D || 0))}${select('Cost (C)', 'sqdcC', sqdcOpts, String(sc.s.C || 0))}</div><div class="actions">${btn('Save Initiative & SQDC', '', 'teal')}</div></form>`) +
       blockerSectionHtml('initiative', id, 'Escalated Blockers (Hoshin Implementation Issues)') +
       panel('Projects', table(['Project', 'Progress', 'Status'], ps.map((p: any) => `<tr class="click" onclick="go('project','${p.id}')"><td>${esc(p.title)}</td><td>${p.progress}%</td><td>${badge(p.status)}</td></tr>`)));
   }
@@ -2087,9 +2155,10 @@ function initSafeQMSEngine() {
     let p = S.projects.find((x: any) => x.id === id);
     if (!p) return head('Project not found');
     let ts = S.tasks.filter((t: any) => t.project === id);
+    const canEditTasks = roleCan('projectWrite', p);
     const parentBlockers = itemBlockers('initiative', p.initiative, false);
     return head('Project A3 – ' + p.title, `${p.id} · ${esc(initiative(p.initiative)?.title)}`, btn('⚑ Escalate blocker', `window.escalateBlocker('project','${id}')`) + btn('Print A3', 'window.print()', 'primary') + btn('Back', "go('projects')")) +
-      `<div class="a3"><div class="split"><div><b>SAFEQMS · PROJECT A3</b><div class="xs muted">${esc(p.title)} · ${p.id} · Owner: ${esc(p.owner)}</div></div>${badge(p.status)}</div><div class="a3grid" style="margin-top:12px">${[['01 · Background / Problem', 'problem'], ['02 · Current Condition', 'current'], ['03 · Target Condition', 'target'], ['04 · Root Cause', 'root'], ['05 · Countermeasures', 'counter'], ['06 · Standardize & Learn', 'learning']].map(x => `<div class="a3box"><h3>${x[0]}</h3><textarea id="${x[1]}" style="width:100%;min-height:75px;border:0;resize:vertical">${esc(p[x[1]])}</textarea></div>`).join('')}<div class="a3box full"><h3>07 · Implementation Plan & Milestones</h3>${table(['Activity', 'Owner', 'Due', 'Status'], ts.map((t: any) => `<tr><td>${esc(t.title)}</td><td>${esc(t.owner)}</td><td>${esc(t.due)}</td><td>${badge(t.status)}</td></tr>`))}</div><div class="a3box full"><h3>08 · Check Results / PDCA & Active Blockers</h3><p>Project execution: <b>${p.progress}%</b> · Goal KPI outcome tracked separately in Bowling Chart.</p>${parentBlockers.length ? `<div class="minirow"><b>Parent Initiative Blockers:</b> ${parentBlockers.map((b: any) => `${esc(b.id)}: ${esc(b.summary)}`).join(' · ')}</div>` : ''}<p class="xs muted">Verify sustained effectiveness before standardization and project closure.</p></div></div></div><div class="actions no-print" style="margin:15px 0">${btn('Save A3 notes', `window.saveProjectA3('${id}')`, 'primary')}${btn('Add activity', `window.addTask('${id}')`)}${btn('View KPIs', "go('kpis')")}</div>` +
+      `<div class="a3"><div class="split"><div><b>SAFEQMS · PROJECT A3</b><div class="xs muted">${esc(p.title)} · ${p.id} · Owner: ${esc(p.owner)}</div></div>${badge(p.status)}</div><div class="a3grid" style="margin-top:12px">${[['01 · Background / Problem', 'problem'], ['02 · Current Condition', 'current'], ['03 · Target Condition', 'target'], ['04 · Root Cause', 'root'], ['05 · Countermeasures', 'counter'], ['06 · Standardize & Learn', 'learning']].map(x => `<div class="a3box"><h3>${x[0]}</h3><textarea id="${x[1]}" style="width:100%;min-height:75px;border:0;resize:vertical">${esc(p[x[1]])}</textarea></div>`).join('')}<div class="a3box full"><h3>07 · Implementation Plan & Milestones</h3>${table(['Activity', 'Owner', 'Due', 'Status'], ts.map((t: any) => `<tr><td>${esc(t.title)}</td><td>${esc(t.owner)}</td><td>${esc(t.due)}</td><td>${canEditTasks ? `<button type="button" class="link" onclick="window.toggleTaskStatus('${t.id}')" title="Click to cycle: Open → In progress → Done">${badge(t.status)}</button>` : badge(t.status)}</td></tr>`))}</div><div class="a3box full"><h3>08 · Check Results / PDCA & Active Blockers</h3><p>Project execution: <b>${p.progress}%</b> · Goal KPI outcome tracked separately in Bowling Chart.</p>${parentBlockers.length ? `<div class="minirow"><b>Parent Initiative Blockers:</b> ${parentBlockers.map((b: any) => `${esc(b.id)}: ${esc(b.summary)}`).join(' · ')}</div>` : ''}<p class="xs muted">Verify sustained effectiveness before standardization and project closure.</p></div></div></div><div class="actions no-print" style="margin:15px 0">${btn('Save A3 notes', `window.saveProjectA3('${id}')`, 'primary')}${btn('Add activity', `window.addTask('${id}')`)}${btn('View KPIs', "go('kpis')")}</div>` +
       blockerSectionHtml('project', id, '09 · Escalated Project Blockers (PDCA Review Input)');
   }
 
@@ -2133,6 +2202,11 @@ function initSafeQMSEngine() {
     const autoCount = queue.filter((x: any) => x.isAuto).length;
     const inReviewCount = queue.filter((x: any) => x.status === 'In review').length;
 
+    const visibleReviews = (S.reviews || []).filter((r: any) =>
+      (!limitedRole() || blockerMatchesScope(r.scope, ASSIGNED_DEPARTMENT)) &&
+      blockerMatchesScope(r.scope, S.scope)
+    );
+
     return head('PDCA Reviews · Implementation Exceptions', 'Management by Exception · Escalated blockers & red KPIs feed directly into review decisions', btn('+ New review', "go('newreview')", 'primary')) +
       roleScopebar() +
       `<div class="cards">${[
@@ -2151,8 +2225,8 @@ function initSafeQMSEngine() {
         </div>` +
         (filtered.length ? filtered.map((b: any) => blockerBoxHtml(b, true)).join('') : '<p class="small muted">No exceptions in this filter for the selected scope.</p>')
       ) +
-      panel('Management review meetings', table(['Review', 'Date', 'Scope', 'Decisions', 'Actions'], S.reviews.map((r: any) => `<tr class="click" onclick="go('review','${r.id}')"><td><b>${esc(r.title)}</b></td><td>${esc(r.date)}</td><td>${esc(r.scope)}</td><td>${r.decisions.length}</td><td>${badge(r.decisions.some((d: any) => d.status === 'Open') ? 'In progress' : 'Completed')}</td></tr>`))) +
-      panel('Carry-forward actions', table(['Decision', 'Linked Record', 'Owner', 'Due', 'Status'], S.reviews.flatMap((r: any) => r.decisions.map((d: any) => {
+      panel('Management review meetings', table(['Review', 'Date', 'Scope', 'Decisions', 'Actions'], visibleReviews.map((r: any) => `<tr class="click" onclick="go('review','${r.id}')"><td><b>${esc(r.title)}</b></td><td>${esc(r.date)}</td><td>${esc(r.scope)}</td><td>${r.decisions.length}</td><td>${badge(r.decisions.some((d: any) => d.status === 'Open') ? 'In progress' : 'Completed')}</td></tr>`))) +
+      panel('Carry-forward actions', table(['Decision', 'Linked Record', 'Owner', 'Due', 'Status'], visibleReviews.flatMap((r: any) => r.decisions.map((d: any) => {
         const link = d.linkedType && d.linkedId ? blockerTargetInfo(d.linkedType, d.linkedId) : null;
         return `<tr><td>${esc(d.text)}${d.blockerId ? ` <span class="pill teal">${esc(d.blockerId)}</span>` : ''}</td><td>${link ? `<button class="link small" onclick="go('${link.route}','${link.routeId}')">${esc(link.code)} · ${esc(link.title)}</button>` : '<span class="xs muted">—</span>'}</td><td>${esc(d.owner)}</td><td>${esc(d.due)}</td><td>${badge(d.status)}</td></tr>`;
       }))));
@@ -2183,24 +2257,25 @@ function initSafeQMSEngine() {
   }
 
   function a3() {
-    let plan = S.plans.find((p: any) => p.scope === S.scope) || S.plans[0], g = roleVisibleGoals(), linked = S.initiatives.filter((i: any) => g.some((x: any) => x.id === i.goal));
+    let plan = S.plans.find((p: any) => p.scope === S.scope) || S.plans[0], g = roleVisibleGoals(), linked = S.initiatives.filter((i: any) => visibleInitiative(i) && g.some((x: any) => initiativeLinkedToGoal(i, x.id)));
     const openBlockers = (S.blockers || []).filter((b: any) => b.status !== 'Resolved' && blockerAllowedByRole(b) && blockerMatchesScope(b.scope, S.scope));
+    const scopedReviews = (S.reviews || []).filter((r: any) => (!limitedRole() || blockerMatchesScope(r.scope, ASSIGNED_DEPARTMENT)) && blockerMatchesScope(r.scope, S.scope));
     return head('Strategy A3', 'Printable strategic one-page view · derived from live records', btn('Print / Save PDF (A3)', 'window.print()', 'primary') + btn('Project A3', "go('project','P-001')")) + roleScopebar() +
       `<div class="banner">Strategy A3 is a generated report, not a second data entry form. Print from your browser and select <b>A3 landscape</b> / Save as PDF.</div>
       <div class="a3"><div class="split" style="margin-bottom:10px"><div><b>SAFEQMS · STRATEGY DEPLOYMENT A3</b><div class="xs muted">${esc(plan.name)} · ${esc(S.scope)} · ${esc(S.year)}</div></div><div class="small">Rev ${plan.revision} · ${badge(plan.status)}</div></div><div class="a3grid">
       <div class="a3box"><h3>01 · Strategic Direction</h3>${g.filter((x: any) => x.level === 'Organization').map((x: any) => `<div class="minirow">• ${esc(x.title)}</div>`).join('') || '<p class="small">Refer to organization breakthrough goals.</p>'}</div>
       <div class="a3box"><h3>02 · Annual Objectives</h3>${g.filter((x: any) => x.level !== 'Organization').map((x: any) => `<div class="minirow">${esc(x.title)} ${badge(x.performance)}</div>`).join('') || '<p class="small">No local annual objectives yet.</p>'}</div>
-      <div class="a3box full"><h3>03 · X-Matrix Relationship Snapshot</h3><div class="strategy-map"><div><div class="coltitle">Long-term goals</div>${S.goals.filter((z: any) => z.level === 'Organization' && visibleToRole(z)).map((z: any) => `<div class="minirow">${esc(z.title)}</div>`).join('')}</div><div><div class="coltitle">Annual objectives</div>${g.filter((z: any) => z.level !== 'Organization').map((z: any) => `<div class="minirow">${esc(z.title)}</div>`).join('')}</div><div><div class="coltitle">Improvement initiatives</div>${S.initiatives.filter(visibleInitiative).map((z: any) => `<div class="minirow">${esc(z.title)}</div>`).join('')}</div><div><div class="coltitle">KPIs</div>${S.kpis.filter((z: any) => g.some((x: any) => x.kpi === z.id)).slice(0, 6).map((z: any) => `<div class="minirow">${esc(z.name)}</div>`).join('')}</div></div><p class="xs muted">Relationship detail:</p>${table(['Objective', 'Strategic initiative', 'Strength'], S.relations.filter((r: any) => r.from.startsWith('G-') && r.to.startsWith('I-')).filter((r: any) => g.some((x: any) => x.id === r.from)).map((r: any) => `<tr><td>${esc(goal(r.from)?.title)}</td><td>${esc(initiative(r.to)?.title)}</td><td>${xm3Strength(r.strength)}</td></tr>`))}</div>
-      <div class="a3box"><h3>04 · KPI / Bowling Snapshot</h3>${g.filter((x: any) => x.kpi).slice(0, 6).map((x: any) => `<div class="minirow">${esc(kpi(x.kpi)?.name)}: <b>${last(kpi(x.kpi)) ?? '—'}</b> / target ${esc(x.target)} ${esc(x.unit)}</div>`).join('')}</div>
+      <div class="a3box full"><h3>03 · X-Matrix Relationship Snapshot</h3><div class="strategy-map"><div><div class="coltitle">Long-term goals</div>${S.goals.filter((z: any) => z.level === 'Organization' && visibleToRole(z)).map((z: any) => `<div class="minirow">${esc(z.title)}</div>`).join('')}</div><div><div class="coltitle">Annual objectives</div>${g.filter((z: any) => z.level !== 'Organization').map((z: any) => `<div class="minirow">${esc(z.title)}</div>`).join('')}</div><div><div class="coltitle">Improvement initiatives</div>${linked.map((z: any) => `<div class="minirow">${esc(z.title)}</div>`).join('')}</div><div><div class="coltitle">KPIs</div>${S.kpis.filter((z: any) => g.some((x: any) => x.kpi === z.id)).slice(0, 6).map((z: any) => `<div class="minirow">${esc(z.name)}</div>`).join('')}</div></div><p class="xs muted">Relationship detail:</p>${table(['Objective', 'Strategic initiative', 'Strength'], S.relations.filter((r: any) => r.from.startsWith('G-') && r.to.startsWith('I-')).filter((r: any) => g.some((x: any) => x.id === r.from)).map((r: any) => `<tr><td>${esc(goal(r.from)?.title)}</td><td>${esc(initiative(r.to)?.title)}</td><td>${xm3Strength(r.strength)}</td></tr>`))}</div>
+      <div class="a3box"><h3>04 · KPI / Bowling Snapshot</h3>${g.filter((x: any) => x.kpi).slice(0, 6).map((x: any) => { const st = computeKpiStatus(kpi(x.kpi)); const tgt = st.target ?? x.target; return `<div class="minirow">${esc(kpi(x.kpi)?.name)}: <b>${st.actual ?? '—'}</b> / target ${esc(tgt)} ${esc(x.unit)}</div>`; }).join('')}</div>
       <div class="a3box"><h3>05 · Improvement Priorities, SQDC & Blockers</h3>${linked.map((x: any) => `<div class="minirow"><b>${esc(x.title)}</b> · ${x.progress}% · ${esc(x.owner)}<div class="xs muted" style="margin-top:2px">[SQDC ${sqdcScore(x).pillars}/4${x.isBottleneck ? ' · TOC Bottleneck' : ''}] ${esc(x.valueStream || '')}</div></div>`).join('') || '<p class="small">Open X-Matrix for all initiative links.</p>'}${openBlockers.length ? `<div class="a3-blocker-list"><b class="xs" style="color:var(--red)">Escalated Blockers (${openBlockers.length}):</b>${openBlockers.map((b: any) => `<div class="minirow xs">⚑ <b>${esc(b.id)}</b> (${esc(b.severity)}): ${esc(b.summary)}</div>`).join('')}</div>` : ''}</div>
-      <div class="a3box full"><h3>06 · Review Decisions & Governance</h3>${S.reviews.slice(-2).flatMap((r: any) => r.decisions).map((d: any) => `<div class="minirow">${esc(d.text)} · ${esc(d.owner)} · ${esc(d.due)} ${badge(d.status)}</div>`).join('') || '<p>No open decisions</p>'}<p class="xs muted">Accountable: ${esc(plan.owner)} · Status: ${esc(plan.status)} · Historical revisions preserved in production implementation</p></div>
+      <div class="a3box full"><h3>06 · Review Decisions & Governance</h3>${scopedReviews.slice(-2).flatMap((r: any) => r.decisions).map((d: any) => `<div class="minirow">${esc(d.text)} · ${esc(d.owner)} · ${esc(d.due)} ${badge(d.status)}</div>`).join('') || '<p>No open decisions</p>'}<p class="xs muted">Accountable: ${esc(plan.owner)} · Status: ${esc(plan.status)} · Historical revisions preserved in production implementation</p></div>
       </div></div>`;
   }
 
   function approvals() {
     return head('Approvals & Alignment', 'Formal approval with ISO planning gates and revision snapshots', btn('ISO Compliance', "go('iso')")) +
       `<div class="banner">General director and QMS auditor are both authorized strategic approvers. All approved goals appear in the General director decision feed; QMS approvals also generate an information notification. Only complete goal plans may be approved. No actual email delivery, backend role enforcement or external integrations are implemented.</div>` +
-      panel('Approval queue', table(['Goal', 'Requester', 'Approver', 'ISO plan', 'Status', 'Decision'], S.approvals.map((a: any) => {
+      panel('Approval queue', table(['Goal', 'Requester', 'Approver', 'ISO plan', 'Status', 'Decision'], S.approvals.filter((a: any) => visibleToRole(goal(a.goal))).map((a: any) => {
         let g = goal(a.goal), v = g && goalPlanCheck(g);
         return `<tr><td><button class="link" onclick="go('goal','${a.goal}')"><b>${esc(g?.title || a.goal)}</b></button><div class="xs muted">${a.id}</div></td><td>${esc(a.requester)}</td><td>${esc(a.approvedBy || a.approver)}</td><td>${v ? (v.ready ? '<span class="isoem">Ready</span>' : '<span class="isoem bad">Incomplete</span>') : '—'}</td><td>${badge(a.status)}</td><td>${a.status === 'Pending' ? `<div class="actions">${btn('Approve', `window.decide('${a.id}','Approved')`, 'teal')}${btn('Request changes', `window.decide('${a.id}','Changes requested')`)}</div>` : '—'}</td></tr>`;
       }))) +
@@ -2304,9 +2379,13 @@ function initSafeQMSEngine() {
         linkedRecords: { riskReferences: g.riskRefs, processReferences: g.processRefs, documentReferences: g.evidenceRefs, evidenceStatus: ev },
         measurement: k ? { id: k.id, name: k.name, unit: k.unit, direction: k.direction, tolerance: k.tolerance, source: k.source, monthlyTargets: k.targets, monthlyActuals: k.values, latest: q } : null,
         approvals: S.approvals.filter((a: any) => a.goal === g.id),
-        relatedInitiatives: S.initiatives.filter((i: any) => S.relations.some((r: any) => r.from === g.id && r.to === i.id)).map((i: any) => ({ id: i.id, title: i.title, owner: i.owner, progress: i.progress, status: i.status }))
+        relatedInitiatives: S.initiatives.filter((i: any) => initiativeLinkedToGoal(i, g.id)).map((i: any) => ({ id: i.id, title: i.title, owner: i.owner, progress: i.progress, status: i.status }))
       };
     });
+    const scopedReviews = (S.reviews || []).filter((r: any) =>
+      (!limitedRole() || blockerMatchesScope(r.scope, ASSIGNED_DEPARTMENT)) &&
+      blockerMatchesScope(r.scope, S.scope)
+    );
     return {
       title: 'SafeQMS Goal Management — Audit Evidence Pack',
       generatedAt: today,
@@ -2315,7 +2394,7 @@ function initSafeQMSEngine() {
       catalogSource: S.isoCatalogSource,
       note: 'Prototype / indicative data. Not verified proof of conformity. External records require backend access.',
       goals: selected,
-      reviewDecisions: S.reviews.flatMap((r: any) => r.decisions.map((d: any) => ({ ...d, review: r.id, reviewDate: r.date }))),
+      reviewDecisions: scopedReviews.flatMap((r: any) => r.decisions.map((d: any) => ({ ...d, review: r.id, reviewDate: r.date }))),
       history: S.history,
       goalRevisions: S.goalRevisions
     };
@@ -2334,6 +2413,10 @@ function initSafeQMSEngine() {
   }
 
   function evidenceBody(gs: any[]) {
+    const scopedReviews = (S.reviews || []).filter((r: any) =>
+      (!limitedRole() || blockerMatchesScope(r.scope, ASSIGNED_DEPARTMENT)) &&
+      blockerMatchesScope(r.scope, S.scope)
+    );
     return `<div class="cards" style="grid-template-columns:repeat(3,1fr)"><div class="card"><div class="label">Goals in evidence pack</div><div class="num">${gs.length}</div></div><div class="card"><div class="label">Complete objective plans</div><div class="num">${gs.filter(x => goalPlanCheck(x).ready).length}</div></div><div class="card"><div class="label">Unresolved ISO IDs</div><div class="num">${gs.flatMap(g => g.isoRefs || []).filter(id => !isoRequirement(id)).length}</div></div></div>
     ${gs.map((g: any) => {
       let p = goalPlanCheck(g), k = kpi(g.kpi), status = computeKpiStatus(k), ev = goalEvidenceCheck(g), apprvs = S.approvals.filter((x: any) => x.goal === g.id);
@@ -2344,7 +2427,7 @@ function initSafeQMSEngine() {
       <h3>Approvals & review trace</h3><p class="small">${apprvs.length ? apprvs.map((a: any) => `${esc(a.status)} by ${esc(a.approvedBy || a.approver)} on ${esc(a.resolvedAt || a.date)}: ${esc(a.comment || '')}`).join(' · '): 'No approval records in demo'}</p>
       <div class="actions no-print">${btn('Open goal', `go('goal','${g.id}')`)}${btn('Open KPI', "go('kpis')")}</div></section>`;
     }).join('')}
-    ${panel('Management review decisions', table(['Decision', 'Owner', 'Due', 'Status'], S.reviews.flatMap((r: any) => r.decisions.map((d: any) => `<tr><td>${esc(d.text)}</td><td>${esc(d.owner)}</td><td>${esc(d.due)}</td><td>${badge(d.status)}</td></tr>`))))}
+    ${panel('Management review decisions', table(['Decision', 'Owner', 'Due', 'Status'], scopedReviews.flatMap((r: any) => r.decisions.map((d: any) => `<tr><td>${esc(d.text)}</td><td>${esc(d.owner)}</td><td>${esc(d.due)}</td><td>${badge(d.status)}</td></tr>`))))}
     <p class="small muted">Audit evidence preparation does not guarantee conformity. Linked ISO requirement IDs and supporting documents must resolve against authenticated SafeQMS records in production.</p>`;
   }
 
@@ -2352,6 +2435,10 @@ function initSafeQMSEngine() {
     let gs = roleVisibleGoals();
     const blockers = (S.blockers || []).filter((b: any) => b.status !== 'Resolved' && blockerAllowedByRole(b) && blockerMatchesScope(b.scope, S.scope));
     const atRiskInits = S.initiatives.filter((i: any) => i.status === 'At risk' && visibleInitiative(i));
+    const scopedReviews = (S.reviews || []).filter((r: any) =>
+      (!limitedRole() || blockerMatchesScope(r.scope, ASSIGNED_DEPARTMENT)) &&
+      blockerMatchesScope(r.scope, S.scope)
+    );
     return {
       complete: gs.filter((g: any) => goalPlanCheck(g).ready),
       gaps: gs.filter((g: any) => !goalPlanCheck(g).ready),
@@ -2359,8 +2446,8 @@ function initSafeQMSEngine() {
       risk: gs.filter((g: any) => g.performance === 'At risk'),
       on: gs.filter((g: any) => g.performance === 'On track'),
       notMeasured: gs.filter((g: any) => g.performance === 'Not measured'),
-      open: S.reviews.flatMap((r: any) => r.decisions.filter((d: any) => d.status === 'Open')),
-      pending: S.approvals.filter((a: any) => a.status === 'Pending'),
+      open: scopedReviews.flatMap((r: any) => r.decisions.filter((d: any) => d.status === 'Open')),
+      pending: S.approvals.filter((a: any) => a.status === 'Pending' && visibleToRole(goal(a.goal))),
       blockers,
       atRiskInits,
       goals: gs
@@ -2390,7 +2477,8 @@ function initSafeQMSEngine() {
 
   function goalForm(g: any, preset?: any) {
     let fresh = !g, level = g?.level || (preset === 'Organization' ? 'Organization' : S.scope), parents = permittedParents(level, g?.id), parent = g?.parent || '', d = g || { isoRefs: [], planWhat: '', resources: '', planDue: '2027-12-31', evaluation: '', riskRefs: '', processRefs: '', evidenceRefs: '' };
-    return head(fresh ? (preset === 'Organization' ? 'Add Main Strategic Goal' : 'Create New Goal') : 'Edit Goal · ' + esc(g.title), fresh ? 'Define → Measure → Plan → ISO → Approve' : `${g.id} · ${g.level} · Revision ${g.revision || 1}`, btn('Back to Goal Cascade', "go('cascade')") + btn('ISO Compliance', "go('iso')")) +
+    const escBtn = !fresh && g?.id ? btn('⚑ Escalate blocker', `window.escalateBlocker('goal','${g.id}')`) : '';
+    return head(fresh ? (preset === 'Organization' ? 'Add Main Strategic Goal' : 'Create New Goal') : 'Edit Goal · ' + esc(g.title), fresh ? 'Define → Measure → Plan → ISO → Approve' : `${g.id} · ${g.level} · Revision ${g.revision || 1}`, escBtn + btn('Back to Goal Cascade', "go('cascade')") + btn('ISO Compliance', "go('iso')")) +
       `<div class="banner"><b>ISO-native workflow:</b> select requirements from SafeQMS ISO Standards references, complete planning information, then request formal approval. A requirement reference alone is not proof of compliance.</div>
       <form id="goalEditor" onsubmit="window.saveGoal(event,'${g?.id || ''}')"><input type="hidden" id="goalID" value="${g?.id || ''}">
       ${panel('1 · Define strategic goal', `<div class="formgrid">${field('Goal title *', 'title', g?.title, 'text', 'required')}<div class="field"><label>Organizational level</label><select name="level" id="goalLevelSelect" onchange="window.goalLevelChanged(this)">${['Organization', 'Site: Uppsala', 'Site: Falkenberg', 'Department: Production', 'Department: Maintenance', 'Department: Quality'].map(x => `<option value="${esc(x)}" ${x === level ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
@@ -2400,7 +2488,8 @@ function initSafeQMSEngine() {
       ${panel('3 · ISO Standards & Requirements', newISORefs(d))}
       ${panel('4 · Implementation planning · objective planning fields', `<div class="formgrid">${field('What will be done *', 'planWhat', d.planWhat, 'text')}${field('Required resources *', 'resources', d.resources, 'text')}${field('When completed *', 'planDue', d.planDue || '2027-12-31', 'date')}${field('How results will be evaluated *', 'evaluation', d.evaluation, 'text')}${field('Risk & opportunity references (6.1)', 'riskRefs', d.riskRefs)}${field('Related processes', 'processRefs', d.processRefs)}${field('Existing evidence / document IDs', 'evidenceRefs', d.evidenceRefs)}</div><p class="xs muted">Risk and evidence references are tracked separately from the minimum planning completeness check. Enter SafeQMS record IDs when connected.</p>`)}
       ${panel('5 · Alignment & governance', `<div class="grid2"><div>${g ? planningUI(g) : '<p class="small">Save the goal to see the live ISO planning checklist.</p>'}</div><div><h3>Approval flow</h3><div class="flow"><span class="step active">Draft</span>→<span class="step">Catchball</span>→<span class="step">Approval</span>→<span class="step">Active</span></div><p class="small">Changing an approved goal creates a draft revision. Submission and approval are blocked until required planning fields are complete.</p>${g ? `<p>Approval: ${badge(g.approval)} · v${g.revision || 1}</p>` : ''}</div></div>`)}
-      <div class="actions no-print" style="margin-bottom:22px"><button class="btn primary" type="submit">Save ${fresh ? 'new draft goal' : 'changes'}</button>${!fresh ? btn('Submit for formal approval', `window.submitGoal('${g.id}')`, 'teal') : ''}${btn('Open ISO Compliance', "go('iso')")}</div></form>`;
+      <div class="actions no-print" style="margin-bottom:22px"><button class="btn primary" type="submit">Save ${fresh ? 'new draft goal' : 'changes'}</button>${!fresh ? btn('Submit for formal approval', `window.submitGoal('${g.id}')`, 'teal') : ''}${btn('Open ISO Compliance', "go('iso')")}</div></form>` +
+      (!fresh && g?.id ? blockerSectionHtml('goal', g.id, 'Escalated Goal Blockers & PDCA Exceptions') : '');
   }
 
   // Catchball components
@@ -2642,12 +2731,19 @@ function initSafeQMSEngine() {
         }
       }
     }
+    if (r === 'initiative' && !roleCan('initiativeWrite', initiative(id || ''))) {
+      let form = document.getElementById('initiativeFocusForm');
+      if (form) {
+        form.querySelectorAll('input,select,textarea,button').forEach((e: any) => e.disabled = true);
+        form.insertAdjacentHTML('afterbegin', '<div class="readonly-notice">Read-only: your SafeQMS role does not have permission to edit this initiative.</div>');
+      }
+    }
     if (['project'].includes(r) && !roleCan('projectWrite', S.projects.find((p: any) => p.id === id))) {
       document.querySelectorAll('.a3 textarea').forEach((e: any) => { e.disabled = true; });
     }
     if (r === 'review' && !roleCan('reviewWrite')) {
       document.querySelectorAll('form').forEach(form => form.querySelectorAll('input,select,textarea,button').forEach((e: any) => e.disabled = true));
-      document.querySelectorAll('.minirow button[onclick^=toggleDecision]').forEach((e: any) => e.disabled = true);
+      document.querySelectorAll('button[onclick*="toggleDecision"]').forEach((e: any) => e.disabled = true);
     }
     if (r === 'import' && isDirector()) {
       let b = document.getElementById('csvInput');
@@ -2794,6 +2890,10 @@ function initSafeQMSEngine() {
   (window as any).saveGoal = (ev: any, id: string) => {
     ev.preventDefault();
     let f = new FormData(ev.target), d: any = Object.fromEntries(f);
+    if (id ? !roleCan('goalEdit', goal(id)) : !roleCan('goalCreate', { level: d.level })) {
+      toast('Your role cannot save or create a goal at this level');
+      return;
+    }
     d.isoRefs = f.getAll('isoRefs');
     d.parent = d.parent || '';
     if (d.level === 'Organization') d.parent = '';
@@ -2810,10 +2910,12 @@ function initSafeQMSEngine() {
     d.target = Number(d.target);
     d.iso = d.isoRefs.map((r: any) => isoName(r)).join(' | ');
 
+    let targetOrKpiChanged = false;
     if (id) {
       let g = goal(id);
       let changed = Object.keys(d).some(k => JSON.stringify(g[k] ?? '') !== JSON.stringify(d[k] ?? ''));
       if (!changed) { toast('No changes to save'); return; }
+      targetOrKpiChanged = g.target !== d.target || g.kpi !== d.kpi;
       if (g.approval === 'Approved') {
         S.goalRevisions.push({ goalId: id, at: today, approvedSnapshot: JSON.parse(JSON.stringify(g)), revision: g.revision || 1 });
         g.revision = (g.revision || 1) + 1;
@@ -2825,15 +2927,18 @@ function initSafeQMSEngine() {
       }
       if (g.parent !== d.parent) S.history.unshift({ time: today, text: `${id}: primary parent changed from ${g.parent || 'none'} to ${d.parent || 'none'}` });
       Object.assign(g, d);
+      if (targetOrKpiChanged) syncKpiTargetsFromGoal(g);
     } else {
       let n = Math.max(0, ...S.goals.map((x: any) => Number(x.id.split('-')[1]) || 0)) + 1;
       id = 'G-' + String(n).padStart(3, '0');
-      S.goals.push({ id, ...d, approval: 'Draft', revision: 1 });
+      const newGoal = { id, ...d, approval: 'Draft', revision: 1 };
+      S.goals.push(newGoal);
       S.history.unshift({ time: today, text: `New goal ${id} saved as draft` });
+      syncKpiTargetsFromGoal(newGoal);
     }
     syncGoalPerformance();
     save();
-    toast('Goal saved — ISO references and hierarchy updated');
+    toast('Goal saved — ISO references, KPI target and hierarchy updated');
     go('goal', id);
   };
   (window as any).submitGoal = async (id: string) => {
@@ -2875,16 +2980,22 @@ function initSafeQMSEngine() {
     const i = initiative(id);
     if (!i || !roleCan('initiativeWrite', i)) return toast('Your role cannot update this initiative');
     const d = Object.fromEntries(new FormData(ev.target)) as any;
+    if (d.progress !== undefined && d.progress !== '' && Number.isFinite(Number(d.progress))) {
+      i.progress = Math.max(0, Math.min(100, Math.round(Number(d.progress))));
+    }
+    if (d.status) i.status = d.status;
     i.valueStream = d.valueStream || '';
     i.isBottleneck = d.isBottleneck === 'true';
     i.sqdc = { S: Number(d.sqdcS || 0), Q: Number(d.sqdcQ || 0), D: Number(d.sqdcD || 0), C: Number(d.sqdcC || 0) };
     save();
     render();
-    toast('SQDC focus & Value Stream updated');
+    toast('Initiative execution, SQDC focus & Value Stream updated');
   };
   (window as any).saveInitiative = (ev: any) => {
     ev.preventDefault();
-    let d = Object.fromEntries(new FormData(ev.target)) as any, n = Math.max(0, ...S.initiatives.map((i: any) => Number(i.id.split('-')[1]) || 0)) + 1;
+    let d = Object.fromEntries(new FormData(ev.target)) as any;
+    if (!roleCan('initiativeWrite', { goal: d.goal })) return toast('Your role cannot create an initiative for this goal');
+    let n = Math.max(0, ...S.initiatives.map((i: any) => Number(i.id.split('-')[1]) || 0)) + 1;
     let id = 'I-' + String(n).padStart(3, '0');
     S.initiatives.push({
       id,
@@ -2905,6 +3016,7 @@ function initSafeQMSEngine() {
   };
   (window as any).saveProjectA3 = (id: string) => {
     let p = S.projects.find((x: any) => x.id === id);
+    if (!p || !roleCan('projectWrite', p)) return toast('Your role cannot edit this Project A3');
     ['problem', 'current', 'target', 'root', 'counter', 'learning'].forEach(k => {
       let el = document.getElementById(k) as HTMLTextAreaElement | null;
       if (el) p[k] = el.value;
@@ -2913,13 +3025,27 @@ function initSafeQMSEngine() {
     toast('Project A3 saved');
   };
   (window as any).addTask = async (id: string) => {
+    let p = S.projects.find((x: any) => x.id === id);
+    if (!p || !roleCan('projectWrite', p)) return toast('Your role cannot add activities to this project');
     let title = await (window as any).__showAppPrompt('New Activity', 'Activity title:', '', true);
     if (!title) return;
     let owner = await (window as any).__showAppPrompt('Responsible Person', 'Responsible person:', 'Project Leader') || 'Project Leader';
     let n = Math.max(0, ...S.tasks.map((t: any) => Number(t.id.split('-')[1]) || 0)) + 1;
     S.tasks.push({ id: 'T-' + String(n).padStart(3, '0'), project: id, title, owner, due: today, status: 'Open' });
+    syncExecutionProgress(id);
     save();
     render();
+    toast('Activity added and project/initiative progress updated');
+  };
+  (window as any).toggleTaskStatus = (taskId: string) => {
+    const t = (S.tasks || []).find((x: any) => x.id === taskId);
+    const p = t ? S.projects.find((x: any) => x.id === t.project) : null;
+    if (!t || !p || !roleCan('projectWrite', p)) return toast('Your role cannot update tasks on this project');
+    t.status = t.status === 'Open' ? 'In progress' : t.status === 'In progress' ? 'Done' : 'Open';
+    syncExecutionProgress(p.id);
+    save();
+    render();
+    toast(`Activity ${t.id} marked ${t.status}; project & initiative progress synced`);
   };
   (window as any).kpiDetail = kpiDetail;
   (window as any).recordKPI = async (id: string) => {
@@ -3059,12 +3185,14 @@ function initSafeQMSEngine() {
   };
   (window as any).createReview = (ev: any) => {
     ev.preventDefault();
+    if (!roleCan('reviewWrite')) return toast('Your role cannot create PDCA reviews');
     let d = Object.fromEntries(new FormData(ev.target)), n = Math.max(0, ...S.reviews.map((r: any) => Number(r.id.split('-')[1]) || 0)) + 1, id = 'R-' + String(n).padStart(3, '0');
     S.reviews.push({ id, ...d, decisions: [] });
     save();
     go('review', id);
   };
   (window as any).toggleDecision = (id: string, i: number) => {
+    if (!roleCan('reviewWrite')) return toast('Your role cannot update PDCA decisions');
     const rev = S.reviews.find((r: any) => r.id === id);
     let d = rev?.decisions?.[i];
     if (!d) return;
@@ -3090,6 +3218,7 @@ function initSafeQMSEngine() {
   };
   (window as any).addDecision = (ev: any, id: string) => {
     ev.preventDefault();
+    if (!roleCan('reviewWrite')) return toast('Your role cannot add PDCA decisions');
     let r = S.reviews.find((x: any) => x.id === id);
     r.decisions.push({ ...Object.fromEntries(new FormData(ev.target)), status: 'Open' });
     save();
@@ -3098,6 +3227,7 @@ function initSafeQMSEngine() {
   (window as any).decide = async (id: string, status: string) => {
     let a = S.approvals.find((x: any) => x.id === id), g = goal(a?.goal);
     if (a?.catchballId) return (window as any).cbFinalDecision(id, status);
+    if (!roleCan('approve')) return toast('Formal approval requires General director or QMS auditor authority');
     if (!a || !g || a.status !== 'Pending') { toast('Approval request is no longer pending'); return; }
     if (status === 'Approved') {
       let v = goalPlanCheck(g);
@@ -3125,6 +3255,7 @@ function initSafeQMSEngine() {
     render();
   };
   (window as any).revisePlan = async (id: string) => {
+    if (!roleCan('config') && !roleCan('approve')) return toast('Your role cannot create strategy plan revisions');
     let p = S.plans.find((x: any) => x.id === id);
     let ok = await (window as any).__showAppConfirm('Create Revision', `Create a draft revision of ${p.name}?`);
     if (!ok) return;
@@ -3266,6 +3397,7 @@ function initSafeQMSEngine() {
     downloadObject(auditPacket(chosenEvidenceGoals()), 'SafeQMS_Goal_Audit_Evidence_Pack.json');
   };
   (window as any).prepareManagementReview = () => {
+    if (!roleCan('reviewPrepare')) return toast('Your role cannot create Management Review drafts');
     let m = managementSummary(), n = Math.max(0, ...S.reviews.map((r: any) => Number(r.id.split('-')[1]) || 0)) + 1, id = 'R-' + String(n).padStart(3, '0');
     const blockerLines = m.blockers.map((b: any) => `- ${b.id} [${b.severity}/${b.category}]: ${b.summary} (Need: ${b.neededAction})`).join('\n');
     let notes = `SafeQMS Goal Management automated input (${today}):\nGoals on track: ${m.on.length}; at risk: ${m.risk.length}; off track: ${m.off.length}; not measured: ${m.notMeasured.length}.\nEscalated blockers (${m.blockers.length}):\n${blockerLines || 'none'}\nGoals with incomplete plans: ${m.gaps.map((g: any) => g.id).join(', ') || 'none'}.\nOpen actions: ${m.open.length}.`;
@@ -3282,9 +3414,10 @@ function initSafeQMSEngine() {
     let t = S.tasks.find((t: any) => t.id === id);
     if (!roleCan('taskOwn', t)) return toast('Only your own assigned activity may be updated');
     t.status = 'Done';
+    syncExecutionProgress(t.project);
     save();
     render();
-    toast('Own task updated');
+    toast('Own task updated and project progress synced');
   };
   (window as any).markDirectorNotice = (id: string) => {
     if (!isGeneral()) return toast('Only General director can acknowledge these updates');
@@ -3433,6 +3566,7 @@ function initSafeQMSEngine() {
       g.resources = c.proposal.resources;
       g.approval = 'Approved';
       g.revision = (g.revision || 1) + 1;
+      syncKpiTargetsFromGoal(g);
       c.status = 'Approved';
       a.status = 'Approved';
       cbRecord(c, 'Approved', note || 'Formal approval recorded', g.target, g.resources);
