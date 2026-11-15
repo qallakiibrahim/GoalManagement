@@ -19,6 +19,8 @@ import {
   Menu,
   MessageSquareMore,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   RefreshCw,
   Settings,
@@ -103,8 +105,27 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   } = useWorkspace();
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('safeqms_sidebar_collapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('safeqms_sidebar_collapsed', next ? '1' : '0');
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!userMenuOpen) return;
@@ -249,9 +270,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       ? activities.filter((a) => a.kind === 'directorNotification' && !a.read)
       : [];
 
-  const NavList = (
-    <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-      {workspaces.length > 1 && (
+  const renderNavList = (collapsed: boolean) => (
+    <nav className={`flex-1 overflow-y-auto ${collapsed ? 'px-2 py-3 space-y-3' : 'px-3 py-4 space-y-5'}`}>
+      {!collapsed && workspaces.length > 1 && (
         <div className="px-2">
           <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] mb-1">
             Active Workspace
@@ -270,16 +291,20 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         </div>
       )}
 
-      {sections.map((sec) => {
-        const visibleItems = sec.items.filter((i) => !i.hidden);
-        if (!visibleItems.length) return null;
-        return (
+      {sections
+        .map((sec) => ({ ...sec, visibleItems: sec.items.filter((i) => !i.hidden) }))
+        .filter((sec) => sec.visibleItems.length > 0)
+        .map((sec, secIdx) => (
           <div key={sec.title} className="space-y-1">
-            <div className="px-2.5 text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-              {sec.title}
-            </div>
+            {!collapsed ? (
+              <div className="px-2.5 text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                {sec.title}
+              </div>
+            ) : (
+              secIdx > 0 && <div className="mx-2 my-1 border-t border-[var(--border)]" />
+            )}
             <div className="space-y-0.5">
-              {visibleItems.map((item) => {
+              {sec.visibleItems.map((item) => {
                 const Icon = item.icon;
                 const isActive =
                   route === item.route ||
@@ -291,25 +316,28 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                   <button
                     key={item.route}
                     type="button"
+                    title={collapsed ? item.label : undefined}
+                    aria-label={item.label}
                     onClick={() => {
                       navigate(item.route);
                       setMobileOpen(false);
                     }}
-                    className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                    className={`w-full flex items-center rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                      collapsed ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-2.5 py-2'
+                    } ${
                       isActive
                         ? 'bg-teal-50 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300'
                         : 'text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)]'
                     }`}
                   >
-                    <Icon className="w-4 h-4 shrink-0" />
-                    <span className="truncate">{item.label}</span>
+                    <Icon className={`${collapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'} shrink-0`} />
+                    {!collapsed && <span className="truncate">{item.label}</span>}
                   </button>
                 );
               })}
             </div>
           </div>
-        );
-      })}
+        ))}
     </nav>
   );
 
@@ -322,10 +350,19 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="lg:hidden rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)]"
+            className="lg:hidden rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] cursor-pointer"
             aria-label="Open navigation"
           >
             <Menu className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={toggleSidebarCollapsed}
+            className="hidden lg:inline-flex rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] cursor-pointer"
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
           </button>
           <button
             type="button"
@@ -485,29 +522,67 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
       <div className="flex flex-1 min-h-0">
         {/* Desktop Sidebar */}
-        <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] no-print">
-          {NavList}
+        <aside
+          className={`hidden lg:flex shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-[width] duration-200 ease-out no-print ${
+            sidebarCollapsed ? 'w-16' : 'w-64'
+          }`}
+        >
+          {renderNavList(sidebarCollapsed)}
           {isActualAdmin && (
-            <div className="border-t border-[var(--border)] p-3.5 space-y-2">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                Admin Role Preview
-              </label>
-              <select
-                value={activeRole}
-                onChange={(e) => setPreviewRole(e.target.value as SafeQmsRole)}
-                className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)]"
-              >
-                {SAFEQMS_ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[10px] text-[var(--muted)] leading-snug">
-                Firestore rules authorize writes via your authenticated Admin UID.
-              </p>
-            </div>
+            sidebarCollapsed ? (
+              <div className="border-t border-[var(--border)] p-2 flex flex-col items-center gap-1">
+                <button
+                  type="button"
+                  onClick={toggleSidebarCollapsed}
+                  title={`Role Preview: ${activeRole} (Click to expand)`}
+                  aria-label="Expand sidebar for Admin Role Preview"
+                  className="w-full flex items-center justify-center rounded-lg py-2 text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] cursor-pointer"
+                >
+                  <UserCog className="w-[18px] h-[18px]" />
+                </button>
+              </div>
+            ) : (
+              <div className="border-t border-[var(--border)] p-3.5 space-y-2">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                  Admin Role Preview
+                </label>
+                <select
+                  value={activeRole}
+                  onChange={(e) => setPreviewRole(e.target.value as SafeQmsRole)}
+                  className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)]"
+                >
+                  {SAFEQMS_ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-[var(--muted)] leading-snug">
+                  Firestore rules authorize writes via your authenticated Admin UID.
+                </p>
+              </div>
+            )
           )}
+          <div className={`border-t border-[var(--border)] ${sidebarCollapsed ? 'p-2' : 'px-3 py-2'}`}>
+            <button
+              type="button"
+              onClick={toggleSidebarCollapsed}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className={`w-full flex items-center rounded-lg text-xs font-semibold text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] transition-colors cursor-pointer ${
+                sidebarCollapsed ? 'justify-center py-2' : 'gap-2 px-2.5 py-1.5'
+              }`}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen className="w-4 h-4 shrink-0" />
+              ) : (
+                <>
+                  <PanelLeftClose className="w-4 h-4 shrink-0" />
+                  <span>Collapse sidebar</span>
+                </>
+              )}
+            </button>
+          </div>
         </aside>
 
         {/* Mobile Drawer */}
@@ -525,7 +600,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              {NavList}
+              {renderNavList(false)}
             </aside>
           </div>
         )}
