@@ -1,0 +1,479 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private user account profile containing PII isolated from shared workspace collections.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "minLength": 3, "maxLength": 200 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "defaultWorkspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "createdAt", "updatedAt"]
+    },
+    "Workspace": {
+      "title": "Workspace",
+      "description": "Shared organization workspace for SafeQMS Goal Management.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array", "description": "Bounded list of up to 50 workspace member UIDs." },
+        "scope": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "year": { "type": "string", "minLength": 4, "maxLength": 20 },
+        "isoCatalogSource": { "type": "string", "maxLength": 300 },
+        "isoStandards": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "ownerUid", "memberUids", "scope", "year", "createdAt", "updatedAt"]
+    },
+    "WorkspaceMember": {
+      "title": "WorkspaceMember",
+      "description": "Non-PII workspace membership and SafeQMS role assignment.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "safeqmsRole": {
+          "type": "string",
+          "enum": ["Administratör", "General director", "Department director", "QMS auditor", "Auditor", "Basic user"]
+        },
+        "assignedSite": { "type": "string", "maxLength": 120 },
+        "assignedDepartment": { "type": "string", "maxLength": 120 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "workspaceId", "ownerUid", "memberUids", "displayName", "safeqmsRole", "createdAt", "updatedAt"]
+    },
+    "StrategyPlan": {
+      "title": "StrategyPlan",
+      "description": "Strategic plan record with revision and approval status.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "scope": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "period": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "status": { "type": "string", "enum": ["Draft", "Pending", "Approved"] },
+        "revision": { "type": "number" },
+        "owner": { "type": "string", "maxLength": 120 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "scope", "period", "name", "status", "revision", "owner", "createdAt", "updatedAt"]
+    },
+    "StrategicGoal": {
+      "title": "StrategicGoal",
+      "description": "Hoshin Kanri goal across Organization, Site, and Department hierarchy.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "level": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "parent": { "type": "string", "maxLength": 128 },
+        "owner": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "year": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "kpi": { "type": "string", "maxLength": 128 },
+        "baseline": { "type": "number" },
+        "target": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["Planned", "Active", "Completed", "Cancelled"] },
+        "approval": { "type": "string", "enum": ["Draft", "Pending", "Approved"] },
+        "performance": { "type": "string", "enum": ["On track", "At risk", "Off track", "Not measured"] },
+        "iso": { "type": "string", "maxLength": 240 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "planWhat": { "type": "string", "maxLength": 1000 },
+        "resources": { "type": "string", "maxLength": 1000 },
+        "planDue": { "type": "string", "maxLength": 40 },
+        "evaluation": { "type": "string", "maxLength": 1000 },
+        "isoRefs": { "type": "array" },
+        "riskRefs": { "type": "string", "maxLength": 240 },
+        "processRefs": { "type": "string", "maxLength": 240 },
+        "evidenceRefs": { "type": "string", "maxLength": 240 },
+        "revision": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "title", "level", "owner", "year", "status", "approval", "performance", "revision", "createdAt", "updatedAt"]
+    },
+    "KpiMetric": {
+      "title": "KpiMetric",
+      "description": "KPI definition with 12-month target and actual series.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "unit": { "type": "string", "maxLength": 40 },
+        "direction": { "type": "string", "enum": ["higher", "lower", "range"] },
+        "tolerance": { "type": "number" },
+        "values": { "type": "array" },
+        "targets": { "type": "array" },
+        "source": { "type": "string", "maxLength": 200 },
+        "sourceUpdated": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "name", "unit", "direction", "tolerance", "values", "targets", "createdAt", "updatedAt"]
+    },
+    "Initiative": {
+      "title": "Initiative",
+      "description": "Strategic initiative with SQDC prioritization and TOC bottleneck metadata.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "owner": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "goal": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "status": { "type": "string", "enum": ["Planned", "On track", "At risk", "Completed"] },
+        "progress": { "type": "number" },
+        "budget": { "type": "string", "maxLength": 80 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "sqdc": { "type": "object" },
+        "valueStream": { "type": "string", "maxLength": 240 },
+        "isBottleneck": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "title", "owner", "goal", "status", "progress", "sqdc", "isBottleneck", "createdAt", "updatedAt"]
+    },
+    "ProjectA3": {
+      "title": "ProjectA3",
+      "description": "A3 problem solving project including escalation tier and 5-Why root cause chain.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "initiative": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "owner": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "status": { "type": "string", "enum": ["Planned", "On track", "At risk", "Completed"] },
+        "progress": { "type": "number" },
+        "escalationTier": { "type": "string", "enum": ["Direct Fix", "5-Why", "Full A3"] },
+        "problem": { "type": "string", "maxLength": 3000 },
+        "current": { "type": "string", "maxLength": 2000 },
+        "target": { "type": "string", "maxLength": 2000 },
+        "root": { "type": "string", "maxLength": 3000 },
+        "fiveWhys": { "type": "array" },
+        "counter": { "type": "string", "maxLength": 3000 },
+        "learning": { "type": "string", "maxLength": 3000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "title", "initiative", "owner", "status", "progress", "createdAt", "updatedAt"]
+    },
+    "ProjectTask": {
+      "title": "ProjectTask",
+      "description": "Implementation milestone/task synced to parent Project A3 and Initiative.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "project": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "owner": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "due": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["Open", "In progress", "Done"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "project", "title", "owner", "status", "createdAt", "updatedAt"]
+    },
+    "MatrixRelation": {
+      "title": "MatrixRelation",
+      "description": "X-Matrix causal link between goals, initiatives, and KPIs.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "from": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "to": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "strength": { "type": "number" },
+        "note": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "from", "to", "strength", "createdAt", "updatedAt"]
+    },
+    "KpiOwnerLink": {
+      "title": "KpiOwnerLink",
+      "description": "X-Matrix South-East Cross-Functional Ownership mapping.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "kpi": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "owner": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "strength": { "type": "number" },
+        "note": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "kpi", "owner", "strength", "createdAt", "updatedAt"]
+    },
+    "PulseCard": {
+      "title": "PulseCard",
+      "description": "Daily Management Board Kanban pulse card supporting escalation and delegation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "details": { "type": "string", "maxLength": 3000 },
+        "due": { "type": "string", "maxLength": 40 },
+        "scope": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "routeType": { "type": "string", "enum": ["Direct fix", "A3", "Escalate"] },
+        "owner": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "kpi": { "type": "string", "maxLength": 128 },
+        "initiative": { "type": "string", "maxLength": 128 },
+        "project": { "type": "string", "maxLength": 128 },
+        "blockerId": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["Team action", "Escalated", "Done"] },
+        "delegatedBy": { "type": "string", "maxLength": 120 },
+        "delegatedAt": { "type": "string", "maxLength": 40 },
+        "delegationNote": { "type": "string", "maxLength": 500 },
+        "createdDate": { "type": "string", "maxLength": 40 },
+        "comments": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "title", "scope", "routeType", "owner", "status", "comments", "createdAt", "updatedAt"]
+    },
+    "SafetyCrossMonth": {
+      "title": "SafetyCrossMonth",
+      "description": "Monthly Safety & Quality Cross status grid per organizational scope.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "scope": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "month": { "type": "string", "minLength": 7, "maxLength": 7, "pattern": "^\\d{4}-\\d{2}$" },
+        "days": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "scope", "month", "days", "createdAt", "updatedAt"]
+    },
+    "EscalatedBlocker": {
+      "title": "EscalatedBlocker",
+      "description": "Escalated operational or strategy blocker routed to PDCA Reviews.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "targetType": { "type": "string", "enum": ["initiative", "project", "kpi", "goal"] },
+        "targetId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "scope": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "category": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "severity": { "type": "string", "enum": ["Critical", "High", "Medium"] },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "neededAction": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "owner": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "raisedBy": { "type": "string", "maxLength": 120 },
+        "raisedAt": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["Open", "In review", "Resolved"] },
+        "source": { "type": "string", "maxLength": 60 },
+        "reviewId": { "type": "string", "maxLength": 128 },
+        "decisionIndex": { "type": "number" },
+        "resolvedAt": { "type": "string", "maxLength": 40 },
+        "resolutionNote": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "targetType", "targetId", "scope", "category", "severity", "summary", "neededAction", "owner", "status", "createdAt", "updatedAt"]
+    },
+    "PdcaReview": {
+      "title": "PdcaReview",
+      "description": "Management PDCA review meeting with carry-forward decisions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "date": { "type": "string", "maxLength": 40 },
+        "scope": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "notes": { "type": "string", "maxLength": 4000 },
+        "decisions": { "type": "array" },
+        "source": { "type": "string", "maxLength": 120 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "title", "date", "scope", "decisions", "createdAt", "updatedAt"]
+    },
+    "CatchballThread": {
+      "title": "CatchballThread",
+      "description": "Bidirectional Hoshin Kanri Catchball negotiation thread.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "goal": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "status": { "type": "string", "enum": ["Draft", "Awaiting director", "Awaiting department", "Changes requested", "Aligned", "Pending approval", "Approved", "Rejected", "Cancelled"] },
+        "recipientScope": { "type": "string", "maxLength": 120 },
+        "recipientRole": { "type": "string", "maxLength": 120 },
+        "origin": { "type": "string", "maxLength": 120 },
+        "turn": { "type": "string", "maxLength": 120 },
+        "proposal": { "type": "object" },
+        "messages": { "type": "array" },
+        "createdDate": { "type": "string", "maxLength": 40 },
+        "updatedDate": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "goal", "status", "origin", "proposal", "messages", "createdAt", "updatedAt"]
+    },
+    "GoalApproval": {
+      "title": "GoalApproval",
+      "description": "Formal governance approval request and decision record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "goal": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "catchballId": { "type": "string", "maxLength": 128 },
+        "requester": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "approver": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "approvedBy": { "type": "string", "maxLength": 120 },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Changes requested", "Superseded"] },
+        "comment": { "type": "string", "maxLength": 1000 },
+        "date": { "type": "string", "maxLength": 40 },
+        "resolvedAt": { "type": "string", "maxLength": 40 },
+        "proposedTarget": { "type": "number" },
+        "proposedResources": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "goal", "requester", "approver", "status", "createdAt", "updatedAt"]
+    },
+    "WorkspaceActivity": {
+      "title": "WorkspaceActivity",
+      "description": "Audit trail entries, notifications, revisions, and CSV import batches.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "workspaceId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "memberUids": { "type": "array" },
+        "kind": { "type": "string", "enum": ["history", "cbNotification", "directorDecision", "directorNotification", "goalRevision", "csvImport"] },
+        "payload": { "type": "object" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "ownerUid", "memberUids", "kind", "payload", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user PII and default workspace preferences."
+    },
+    "/workspaces/{workspaceId}": {
+      "schema": { "$ref": "#/entities/Workspace" },
+      "description": "Top-level SafeQMS workspace configuration and bounded memberUids."
+    },
+    "/workspaces/{workspaceId}/members/{memberId}": {
+      "schema": { "$ref": "#/entities/WorkspaceMember" },
+      "description": "Workspace member roles and organizational unit assignments."
+    },
+    "/workspaces/{workspaceId}/plans/{planId}": {
+      "schema": { "$ref": "#/entities/StrategyPlan" },
+      "description": "Strategy plan headers and revisions."
+    },
+    "/workspaces/{workspaceId}/goals/{goalId}": {
+      "schema": { "$ref": "#/entities/StrategicGoal" },
+      "description": "Hoshin Kanri goals across organization, site, and department levels."
+    },
+    "/workspaces/{workspaceId}/kpis/{kpiId}": {
+      "schema": { "$ref": "#/entities/KpiMetric" },
+      "description": "KPI definitions and monthly bowling chart values."
+    },
+    "/workspaces/{workspaceId}/initiatives/{initiativeId}": {
+      "schema": { "$ref": "#/entities/Initiative" },
+      "description": "Strategic initiatives with SQDC and TOC bottleneck scoring."
+    },
+    "/workspaces/{workspaceId}/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/ProjectA3" },
+      "description": "Project A3 boards with 5-Why root cause chains and escalation tier."
+    },
+    "/workspaces/{workspaceId}/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/ProjectTask" },
+      "description": "Project execution tasks synced to Project A3 and Initiative %."
+    },
+    "/workspaces/{workspaceId}/relations/{relationId}": {
+      "schema": { "$ref": "#/entities/MatrixRelation" },
+      "description": "X-Matrix links between goals, initiatives, and KPIs."
+    },
+    "/workspaces/{workspaceId}/kpiOwners/{kpiOwnerId}": {
+      "schema": { "$ref": "#/entities/KpiOwnerLink" },
+      "description": "X-Matrix South-East Cross-Functional Ownership mapping."
+    },
+    "/workspaces/{workspaceId}/pulseCards/{cardId}": {
+      "schema": { "$ref": "#/entities/PulseCard" },
+      "description": "Daily Management Kanban pulse cards."
+    },
+    "/workspaces/{workspaceId}/safetyCross/{crossId}": {
+      "schema": { "$ref": "#/entities/SafetyCrossMonth" },
+      "description": "Monthly Safety Cross daily safety/quality logs."
+    },
+    "/workspaces/{workspaceId}/blockers/{blockerId}": {
+      "schema": { "$ref": "#/entities/EscalatedBlocker" },
+      "description": "Escalated implementation blockers synced with Daily Board and PDCA Reviews."
+    },
+    "/workspaces/{workspaceId}/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/PdcaReview" },
+      "description": "PDCA review meetings and tracked decisions."
+    },
+    "/workspaces/{workspaceId}/catchballs/{catchballId}": {
+      "schema": { "$ref": "#/entities/CatchballThread" },
+      "description": "Bidirectional Catchball alignment threads."
+    },
+    "/workspaces/{workspaceId}/approvals/{approvalId}": {
+      "schema": { "$ref": "#/entities/GoalApproval" },
+      "description": "Formal goal approval workflow records."
+    },
+    "/workspaces/{workspaceId}/activities/{activityId}": {
+      "schema": { "$ref": "#/entities/WorkspaceActivity" },
+      "description": "Immutable history, notifications, goal revisions, and CSV import logs."
+    }
+  }
+}

@@ -1,0 +1,964 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Global Hardened Primitives
+    // -------------------------------------------------------------------------
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && ('email' in request.auth.token) && request.auth.token.email.lower() == 'ibrahim.qallaki@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function isStr(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isOptStr(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    function isOptNum(data, field) {
+      return !(field in data) || (data[field] is number);
+    }
+
+    function isValidMemberUids(data) {
+      return data.memberUids is list
+        && data.memberUids.size() >= 1
+        && data.memberUids.size() <= 50
+        && data.memberUids[0] is string;
+    }
+
+    function isImmutableCreate(data) {
+      return data.createdAt == request.time && data.updatedAt == request.time;
+    }
+
+    function isImmutableUpdate(data, prev) {
+      return data.createdAt == prev.createdAt
+        && data.updatedAt == request.time
+        && data.ownerUid == prev.ownerUid
+        && data.workspaceId == prev.workspaceId;
+    }
+
+    // -------------------------------------------------------------------------
+    // Relational Workspace & RBAC Helpers (Single-doc / write paths only)
+    // -------------------------------------------------------------------------
+    function wsExists(workspaceId) {
+      return exists(/databases/$(database)/documents/workspaces/$(workspaceId));
+    }
+
+    function wsData(workspaceId) {
+      return get(/databases/$(database)/documents/workspaces/$(workspaceId)).data;
+    }
+
+    function isWsMember(workspaceId) {
+      return isBootstrappedAdmin() || (
+        isSignedIn() && wsExists(workspaceId) && (
+          wsData(workspaceId).ownerUid == request.auth.uid ||
+          request.auth.uid in wsData(workspaceId).memberUids
+        )
+      );
+    }
+
+    function memberExists(workspaceId) {
+      return exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid));
+    }
+
+    function wsRole(workspaceId) {
+      return isBootstrappedAdmin() ? 'Administratör'
+        : memberExists(workspaceId) ? get(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)).data.safeqmsRole
+        : (wsExists(workspaceId) && wsData(workspaceId).ownerUid == request.auth.uid) ? 'Administratör'
+        : 'Basic user';
+    }
+
+    function isWsAdmin(workspaceId) {
+      return isAdmin() || (isWsMember(workspaceId) && (wsData(workspaceId).ownerUid == request.auth.uid || wsRole(workspaceId) == 'Administratör'));
+    }
+
+    function isWsLeadership(workspaceId) {
+      return isWsAdmin(workspaceId) || (isWsMember(workspaceId) && wsRole(workspaceId) in ['General director', 'QMS auditor']);
+    }
+
+    function isWsManagerOrDirector(workspaceId) {
+      return isWsLeadership(workspaceId) || (isWsMember(workspaceId) && wsRole(workspaceId) == 'Department director');
+    }
+
+    function isWsNonAuditor(workspaceId) {
+      return isWsMember(workspaceId) && wsRole(workspaceId) != 'Auditor';
+    }
+
+    // -------------------------------------------------------------------------
+    // Connection Health Check
+    // -------------------------------------------------------------------------
+    match /test/{docId} {
+      allow get: if isSignedIn() && isValidId(docId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Admins Registry (Read-only from client)
+    // -------------------------------------------------------------------------
+    match /admins/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Users PII Collection (Strict Owner/Admin Isolation)
+    // -------------------------------------------------------------------------
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'defaultWorkspaceId', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && isStr(data.email, 3, 200)
+        && isStr(data.displayName, 1, 120)
+        && (!('defaultWorkspaceId' in data) || isValidId(data.defaultWorkspaceId));
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().uid == request.auth.uid);
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == request.auth.uid
+        && isImmutableCreate(incoming());
+      allow update: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'defaultWorkspaceId', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Top-level Workspace Collection
+    // -------------------------------------------------------------------------
+    function isValidWorkspace(data, workspaceId) {
+      return data.keys().hasAll(['id', 'name', 'ownerUid', 'memberUids', 'scope', 'year', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'ownerUid', 'memberUids', 'scope', 'year', 'isoCatalogSource', 'isoStandards', 'createdAt', 'updatedAt'])
+        && data.id == workspaceId
+        && isValidId(data.id)
+        && isStr(data.name, 1, 140)
+        && isValidId(data.ownerUid)
+        && isValidMemberUids(data)
+        && isStr(data.scope, 1, 120)
+        && isStr(data.year, 4, 20)
+        && isOptStr(data, 'isoCatalogSource', 300)
+        && (!('isoStandards' in data) || (data.isoStandards is list && data.isoStandards.size() <= 20));
+    }
+
+    match /workspaces/{workspaceId} {
+      allow get: if isValidId(workspaceId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+      allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+      allow create: if isValidId(workspaceId)
+        && isSignedIn()
+        && isValidWorkspace(incoming(), workspaceId)
+        && incoming().ownerUid == request.auth.uid
+        && request.auth.uid in incoming().memberUids
+        && isImmutableCreate(incoming());
+      allow update: if isValidId(workspaceId)
+        && isSignedIn()
+        && isValidWorkspace(incoming(), workspaceId)
+        && incoming().id == existing().id
+        && incoming().ownerUid == existing().ownerUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'memberUids', 'scope', 'year', 'isoCatalogSource', 'isoStandards', 'updatedAt'])) ||
+          (isWsNonAuditor(workspaceId) && incoming().memberUids == existing().memberUids && incoming().diff(existing()).affectedKeys().hasOnly(['scope', 'year', 'updatedAt']))
+        );
+      allow delete: if false;
+
+      // -----------------------------------------------------------------------
+      // Workspace Members (Non-PII RBAC Registry)
+      // -----------------------------------------------------------------------
+      function isValidMember(data, memberId) {
+        return data.keys().hasAll(['uid', 'workspaceId', 'ownerUid', 'memberUids', 'displayName', 'safeqmsRole', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['uid', 'workspaceId', 'ownerUid', 'memberUids', 'displayName', 'safeqmsRole', 'assignedSite', 'assignedDepartment', 'createdAt', 'updatedAt'])
+          && data.uid == memberId
+          && data.workspaceId == workspaceId
+          && isValidId(data.uid)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isStr(data.displayName, 1, 120)
+          && data.safeqmsRole in ['Administratör', 'General director', 'Department director', 'QMS auditor', 'Auditor', 'Basic user']
+          && isOptStr(data, 'assignedSite', 120)
+          && isOptStr(data, 'assignedDepartment', 120);
+      }
+
+      match /members/{memberId} {
+        allow get: if isValidId(workspaceId) && isValidId(memberId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(memberId)
+          && isSignedIn()
+          && isValidMember(incoming(), memberId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && (
+            (isWsAdmin(workspaceId) && incoming().ownerUid == wsData(workspaceId).ownerUid) ||
+            (wsData(workspaceId).ownerUid == request.auth.uid && incoming().ownerUid == request.auth.uid) ||
+            (memberId == request.auth.uid && incoming().ownerUid == wsData(workspaceId).ownerUid && incoming().safeqmsRole == 'Basic user' && request.auth.uid in wsData(workspaceId).memberUids)
+          );
+        allow update: if isValidId(workspaceId) && isValidId(memberId)
+          && isSignedIn()
+          && isValidMember(incoming(), memberId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().uid == existing().uid
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'safeqmsRole', 'assignedSite', 'assignedDepartment', 'memberUids', 'updatedAt'])) ||
+            (isOwner(memberId) && incoming().safeqmsRole == existing().safeqmsRole && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']))
+          );
+        allow delete: if isValidId(workspaceId) && isValidId(memberId) && isWsAdmin(workspaceId) && memberId != wsData(workspaceId).ownerUid;
+      }
+
+      // -----------------------------------------------------------------------
+      // Strategy Plans
+      // -----------------------------------------------------------------------
+      function isValidPlan(data, planId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'scope', 'period', 'name', 'status', 'revision', 'owner', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['id', 'workspaceId', 'ownerUid', 'memberUids', 'scope', 'period', 'name', 'status', 'revision', 'owner', 'createdAt', 'updatedAt'])
+          && data.id == planId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isStr(data.scope, 1, 120)
+          && isStr(data.period, 1, 40)
+          && isStr(data.name, 1, 240)
+          && data.status in ['Draft', 'Pending', 'Approved']
+          && data.revision is number && data.revision >= 1 && data.revision <= 999
+          && isStr(data.owner, 1, 120);
+      }
+
+      match /plans/{planId} {
+        allow get: if isValidId(workspaceId) && isValidId(planId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(planId)
+          && isSignedIn()
+          && isValidPlan(incoming(), planId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsLeadership(workspaceId);
+        allow update: if isValidId(workspaceId) && isValidId(planId)
+          && isSignedIn()
+          && isValidPlan(incoming(), planId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'scope', 'period', 'status', 'revision', 'owner', 'memberUids', 'updatedAt'])) ||
+            (isWsLeadership(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'status', 'revision', 'owner', 'updatedAt']))
+          );
+        allow delete: if false;
+      }
+
+      // -----------------------------------------------------------------------
+      // Strategic Goals
+      // -----------------------------------------------------------------------
+      function isValidGoal(data, goalId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'title', 'level', 'owner', 'year', 'status', 'approval', 'performance', 'revision', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly([
+            'id', 'workspaceId', 'ownerUid', 'memberUids', 'title', 'level', 'parent', 'owner', 'year',
+            'kpi', 'baseline', 'target', 'unit', 'status', 'approval', 'performance', 'iso', 'description',
+            'planWhat', 'resources', 'planDue', 'evaluation', 'isoRefs', 'riskRefs', 'processRefs', 'evidenceRefs',
+            'revision', 'createdAt', 'updatedAt'
+          ])
+          && data.id == goalId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isStr(data.title, 1, 200)
+          && isStr(data.level, 1, 120)
+          && isOptStr(data, 'parent', 128)
+          && isStr(data.owner, 1, 120)
+          && isStr(data.year, 1, 40)
+          && isOptStr(data, 'kpi', 128)
+          && isOptNum(data, 'baseline')
+          && isOptNum(data, 'target')
+          && isOptStr(data, 'unit', 40)
+          && data.status in ['Planned', 'Active', 'Completed', 'Cancelled']
+          && data.approval in ['Draft', 'Pending', 'Approved']
+          && data.performance in ['On track', 'At risk', 'Off track', 'Not measured']
+          && isOptStr(data, 'iso', 240)
+          && isOptStr(data, 'description', 2000)
+          && isOptStr(data, 'planWhat', 1000)
+          && isOptStr(data, 'resources', 1000)
+          && isOptStr(data, 'planDue', 40)
+          && isOptStr(data, 'evaluation', 1000)
+          && (!('isoRefs' in data) || (data.isoRefs is list && data.isoRefs.size() <= 30))
+          && isOptStr(data, 'riskRefs', 240)
+          && isOptStr(data, 'processRefs', 240)
+          && isOptStr(data, 'evidenceRefs', 240)
+          && data.revision is number && data.revision >= 1 && data.revision <= 999;
+      }
+
+      match /goals/{goalId} {
+        allow get: if isValidId(workspaceId) && isValidId(goalId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(goalId)
+          && isSignedIn()
+          && isValidGoal(incoming(), goalId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsManagerOrDirector(workspaceId)
+          && (isWsLeadership(workspaceId) || incoming().approval in ['Draft', 'Pending']);
+        allow update: if isValidId(workspaceId) && isValidId(goalId)
+          && isSignedIn()
+          && isValidGoal(incoming(), goalId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'level', 'parent', 'owner', 'year', 'kpi', 'baseline', 'target', 'unit',
+              'status', 'approval', 'performance', 'iso', 'description', 'planWhat', 'resources',
+              'planDue', 'evaluation', 'isoRefs', 'riskRefs', 'processRefs', 'evidenceRefs',
+              'revision', 'memberUids', 'updatedAt'
+            ])) ||
+            (isWsLeadership(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'level', 'parent', 'owner', 'year', 'kpi', 'baseline', 'target', 'unit',
+              'status', 'approval', 'performance', 'iso', 'description', 'planWhat', 'resources',
+              'planDue', 'evaluation', 'isoRefs', 'riskRefs', 'processRefs', 'evidenceRefs',
+              'revision', 'updatedAt'
+            ])) ||
+            (isWsManagerOrDirector(workspaceId)
+              && existing().approval != 'Approved'
+              && incoming().approval in ['Draft', 'Pending']
+              && incoming().diff(existing()).affectedKeys().hasOnly([
+                'title', 'parent', 'owner', 'year', 'kpi', 'baseline', 'target', 'unit',
+                'status', 'approval', 'performance', 'iso', 'description', 'planWhat', 'resources',
+                'planDue', 'evaluation', 'isoRefs', 'riskRefs', 'processRefs', 'evidenceRefs',
+                'revision', 'updatedAt'
+              ])) ||
+            (isWsNonAuditor(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['performance', 'updatedAt']))
+          );
+        allow delete: if isValidId(workspaceId) && isValidId(goalId) && isWsAdmin(workspaceId);
+      }
+
+      // -----------------------------------------------------------------------
+      // KPI Metrics
+      // -----------------------------------------------------------------------
+      function isValidKpi(data, kpiId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'name', 'unit', 'direction', 'tolerance', 'values', 'targets', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['id', 'workspaceId', 'ownerUid', 'memberUids', 'name', 'unit', 'direction', 'tolerance', 'values', 'targets', 'source', 'sourceUpdated', 'createdAt', 'updatedAt'])
+          && data.id == kpiId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isStr(data.name, 1, 200)
+          && isStr(data.unit, 0, 40)
+          && data.direction in ['higher', 'lower', 'range']
+          && data.tolerance is number
+          && data.values is list && data.values.size() <= 12
+          && data.targets is list && data.targets.size() <= 12
+          && isOptStr(data, 'source', 200)
+          && isOptStr(data, 'sourceUpdated', 40);
+      }
+
+      match /kpis/{kpiId} {
+        allow get: if isValidId(workspaceId) && isValidId(kpiId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(kpiId)
+          && isSignedIn()
+          && isValidKpi(incoming(), kpiId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsLeadership(workspaceId);
+        allow update: if isValidId(workspaceId) && isValidId(kpiId)
+          && isSignedIn()
+          && isValidKpi(incoming(), kpiId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'unit', 'direction', 'tolerance', 'values', 'targets', 'source', 'sourceUpdated', 'memberUids', 'updatedAt'])) ||
+            (isWsManagerOrDirector(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['values', 'targets', 'source', 'sourceUpdated', 'updatedAt']))
+          );
+        allow delete: if false;
+      }
+
+      // -----------------------------------------------------------------------
+      // Initiatives
+      // -----------------------------------------------------------------------
+      function isValidInitiative(data, initId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'title', 'owner', 'goal', 'status', 'progress', 'sqdc', 'isBottleneck', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['id', 'workspaceId', 'ownerUid', 'memberUids', 'title', 'owner', 'goal', 'status', 'progress', 'budget', 'description', 'sqdc', 'valueStream', 'isBottleneck', 'createdAt', 'updatedAt'])
+          && data.id == initId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isStr(data.title, 1, 200)
+          && isStr(data.owner, 1, 120)
+          && isValidId(data.goal)
+          && data.status in ['Planned', 'On track', 'At risk', 'Completed']
+          && data.progress is number && data.progress >= 0 && data.progress <= 100
+          && isOptStr(data, 'budget', 80)
+          && isOptStr(data, 'description', 2000)
+          && data.sqdc is map
+          && data.sqdc.keys().hasAll(['S', 'Q', 'D', 'C'])
+          && data.sqdc.keys().hasOnly(['S', 'Q', 'D', 'C'])
+          && isOptStr(data, 'valueStream', 240)
+          && data.isBottleneck is bool;
+      }
+
+      match /initiatives/{initiativeId} {
+        allow get: if isValidId(workspaceId) && isValidId(initiativeId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(initiativeId)
+          && isSignedIn()
+          && isValidInitiative(incoming(), initiativeId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsManagerOrDirector(workspaceId);
+        allow update: if isValidId(workspaceId) && isValidId(initiativeId)
+          && isSignedIn()
+          && isValidInitiative(incoming(), initiativeId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'owner', 'goal', 'status', 'progress', 'budget', 'description', 'sqdc', 'valueStream', 'isBottleneck', 'memberUids', 'updatedAt'])) ||
+            (isWsManagerOrDirector(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'owner', 'goal', 'status', 'progress', 'budget', 'description', 'sqdc', 'valueStream', 'isBottleneck', 'updatedAt'])) ||
+            (isWsNonAuditor(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'status', 'updatedAt']))
+          );
+        allow delete: if false;
+      }
+
+      // -----------------------------------------------------------------------
+      // Projects A3
+      // -----------------------------------------------------------------------
+      function isValidProject(data, projId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'title', 'initiative', 'owner', 'status', 'progress', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['id', 'workspaceId', 'ownerUid', 'memberUids', 'title', 'initiative', 'owner', 'status', 'progress', 'escalationTier', 'problem', 'current', 'target', 'root', 'fiveWhys', 'counter', 'learning', 'createdAt', 'updatedAt'])
+          && data.id == projId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isStr(data.title, 1, 200)
+          && isValidId(data.initiative)
+          && isStr(data.owner, 1, 120)
+          && data.status in ['Planned', 'On track', 'At risk', 'Completed']
+          && data.progress is number && data.progress >= 0 && data.progress <= 100
+          && (!('escalationTier' in data) || data.escalationTier in ['Direct Fix', '5-Why', 'Full A3'])
+          && isOptStr(data, 'problem', 3000)
+          && isOptStr(data, 'current', 2000)
+          && isOptStr(data, 'target', 2000)
+          && isOptStr(data, 'root', 3000)
+          && (!('fiveWhys' in data) || (data.fiveWhys is list && data.fiveWhys.size() <= 5))
+          && isOptStr(data, 'counter', 3000)
+          && isOptStr(data, 'learning', 3000);
+      }
+
+      match /projects/{projectId} {
+        allow get: if isValidId(workspaceId) && isValidId(projectId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(projectId)
+          && isSignedIn()
+          && isValidProject(incoming(), projectId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsManagerOrDirector(workspaceId);
+        allow update: if isValidId(workspaceId) && isValidId(projectId)
+          && isSignedIn()
+          && isValidProject(incoming(), projectId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'owner', 'status', 'progress', 'escalationTier', 'problem', 'current', 'target', 'root', 'fiveWhys', 'counter', 'learning', 'memberUids', 'updatedAt'])) ||
+            (isWsManagerOrDirector(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'owner', 'status', 'progress', 'escalationTier', 'problem', 'current', 'target', 'root', 'fiveWhys', 'counter', 'learning', 'updatedAt'])) ||
+            (isWsNonAuditor(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'status', 'updatedAt']))
+          );
+        allow delete: if false;
+      }
+
+      // -----------------------------------------------------------------------
+      // Project Tasks
+      // -----------------------------------------------------------------------
+      function isValidTask(data, taskId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'project', 'title', 'owner', 'status', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['id', 'workspaceId', 'ownerUid', 'memberUids', 'project', 'title', 'owner', 'due', 'status', 'createdAt', 'updatedAt'])
+          && data.id == taskId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isValidId(data.project)
+          && isStr(data.title, 1, 240)
+          && isStr(data.owner, 1, 120)
+          && isOptStr(data, 'due', 40)
+          && data.status in ['Open', 'In progress', 'Done'];
+      }
+
+      match /tasks/{taskId} {
+        allow get: if isValidId(workspaceId) && isValidId(taskId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(taskId)
+          && isSignedIn()
+          && isValidTask(incoming(), taskId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsManagerOrDirector(workspaceId);
+        allow update: if isValidId(workspaceId) && isValidId(taskId)
+          && isSignedIn()
+          && isValidTask(incoming(), taskId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'owner', 'due', 'status', 'memberUids', 'updatedAt'])) ||
+            (isWsManagerOrDirector(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'owner', 'due', 'status', 'updatedAt'])) ||
+            (isWsNonAuditor(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+          );
+        allow delete: if false;
+      }
+
+      // -----------------------------------------------------------------------
+      // X-Matrix Relations & KPI Owners
+      // -----------------------------------------------------------------------
+      function isValidRelation(data, relId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'from', 'to', 'strength', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['id', 'workspaceId', 'ownerUid', 'memberUids', 'from', 'to', 'strength', 'note', 'createdAt', 'updatedAt'])
+          && data.id == relId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isStr(data.from, 1, 128)
+          && isStr(data.to, 1, 128)
+          && data.strength is number && data.strength >= 0 && data.strength <= 2
+          && isOptStr(data, 'note', 1000);
+      }
+
+      match /relations/{relationId} {
+        allow get: if isValidId(workspaceId) && isValidId(relationId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(relationId)
+          && isSignedIn()
+          && isValidRelation(incoming(), relationId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsManagerOrDirector(workspaceId);
+        allow update: if isValidId(workspaceId) && isValidId(relationId)
+          && isSignedIn()
+          && isValidRelation(incoming(), relationId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['strength', 'note', 'memberUids', 'updatedAt'])) ||
+            (isWsManagerOrDirector(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['strength', 'note', 'updatedAt']))
+          );
+        allow delete: if isValidId(workspaceId) && isValidId(relationId) && isWsManagerOrDirector(workspaceId);
+      }
+
+      function isValidKpiOwner(data, kpiOwnerId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'kpi', 'owner', 'strength', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['id', 'workspaceId', 'ownerUid', 'memberUids', 'kpi', 'owner', 'strength', 'note', 'createdAt', 'updatedAt'])
+          && data.id == kpiOwnerId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isStr(data.kpi, 1, 128)
+          && isStr(data.owner, 1, 120)
+          && data.strength is number && data.strength >= 0 && data.strength <= 2
+          && isOptStr(data, 'note', 1000);
+      }
+
+      match /kpiOwners/{kpiOwnerId} {
+        allow get: if isValidId(workspaceId) && isValidId(kpiOwnerId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(kpiOwnerId)
+          && isSignedIn()
+          && isValidKpiOwner(incoming(), kpiOwnerId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsManagerOrDirector(workspaceId);
+        allow update: if isValidId(workspaceId) && isValidId(kpiOwnerId)
+          && isSignedIn()
+          && isValidKpiOwner(incoming(), kpiOwnerId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['strength', 'note', 'memberUids', 'updatedAt'])) ||
+            (isWsManagerOrDirector(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['strength', 'note', 'updatedAt']))
+          );
+        allow delete: if isValidId(workspaceId) && isValidId(kpiOwnerId) && isWsManagerOrDirector(workspaceId);
+      }
+
+      // -----------------------------------------------------------------------
+      // Daily Board: Pulse Cards & Safety Cross
+      // -----------------------------------------------------------------------
+      function isValidPulseCard(data, cardId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'title', 'scope', 'routeType', 'owner', 'status', 'comments', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly([
+            'id', 'workspaceId', 'ownerUid', 'memberUids', 'title', 'details', 'due', 'scope', 'routeType',
+            'owner', 'kpi', 'initiative', 'project', 'blockerId', 'status', 'delegatedBy', 'delegatedAt',
+            'delegationNote', 'createdDate', 'comments', 'createdAt', 'updatedAt'
+          ])
+          && data.id == cardId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isStr(data.title, 1, 240)
+          && isOptStr(data, 'details', 3000)
+          && isOptStr(data, 'due', 40)
+          && isStr(data.scope, 1, 120)
+          && data.routeType in ['Direct fix', 'A3', 'Escalate']
+          && isStr(data.owner, 1, 120)
+          && isOptStr(data, 'kpi', 128)
+          && isOptStr(data, 'initiative', 128)
+          && isOptStr(data, 'project', 128)
+          && isOptStr(data, 'blockerId', 128)
+          && data.status in ['Team action', 'Escalated', 'Done']
+          && isOptStr(data, 'delegatedBy', 120)
+          && isOptStr(data, 'delegatedAt', 40)
+          && isOptStr(data, 'delegationNote', 500)
+          && isOptStr(data, 'createdDate', 40)
+          && data.comments is list && data.comments.size() <= 50;
+      }
+
+      match /pulseCards/{cardId} {
+        allow get: if isValidId(workspaceId) && isValidId(cardId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(cardId)
+          && isSignedIn()
+          && isValidPulseCard(incoming(), cardId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsNonAuditor(workspaceId);
+        allow update: if isValidId(workspaceId) && isValidId(cardId)
+          && isSignedIn()
+          && isValidPulseCard(incoming(), cardId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'details', 'due', 'scope', 'routeType', 'owner', 'kpi', 'initiative', 'project',
+              'blockerId', 'status', 'delegatedBy', 'delegatedAt', 'delegationNote', 'comments', 'memberUids', 'updatedAt'
+            ])) ||
+            (isWsNonAuditor(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'details', 'due', 'scope', 'routeType', 'owner', 'kpi', 'initiative', 'project',
+              'blockerId', 'status', 'delegatedBy', 'delegatedAt', 'delegationNote', 'comments', 'updatedAt'
+            ]))
+          );
+        allow delete: if false;
+      }
+
+      function isValidSafetyCross(data, crossId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'scope', 'month', 'days', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['id', 'workspaceId', 'ownerUid', 'memberUids', 'scope', 'month', 'days', 'createdAt', 'updatedAt'])
+          && data.id == crossId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isStr(data.scope, 1, 120)
+          && isStr(data.month, 7, 7) && data.month.matches('^\\d{4}-\\d{2}$')
+          && data.days is map && data.days.size() <= 31;
+      }
+
+      match /safetyCross/{crossId} {
+        allow get: if isValidId(workspaceId) && isValidId(crossId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(crossId)
+          && isSignedIn()
+          && isValidSafetyCross(incoming(), crossId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsNonAuditor(workspaceId);
+        allow update: if isValidId(workspaceId) && isValidId(crossId)
+          && isSignedIn()
+          && isValidSafetyCross(incoming(), crossId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['days', 'memberUids', 'updatedAt'])) ||
+            (isWsNonAuditor(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['days', 'updatedAt']))
+          );
+        allow delete: if false;
+      }
+
+      // -----------------------------------------------------------------------
+      // Escalated Blockers
+      // -----------------------------------------------------------------------
+      function isValidBlocker(data, blockerId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'targetType', 'targetId', 'scope', 'category', 'severity', 'summary', 'neededAction', 'owner', 'status', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly([
+            'id', 'workspaceId', 'ownerUid', 'memberUids', 'targetType', 'targetId', 'scope', 'category',
+            'severity', 'summary', 'neededAction', 'owner', 'raisedBy', 'raisedAt', 'status', 'source',
+            'reviewId', 'decisionIndex', 'resolvedAt', 'resolutionNote', 'createdAt', 'updatedAt'
+          ])
+          && data.id == blockerId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && data.targetType in ['initiative', 'project', 'kpi', 'goal']
+          && isStr(data.targetId, 1, 128)
+          && isStr(data.scope, 1, 120)
+          && isStr(data.category, 1, 80)
+          && data.severity in ['Critical', 'High', 'Medium']
+          && isStr(data.summary, 1, 1000)
+          && isStr(data.neededAction, 1, 1000)
+          && isStr(data.owner, 1, 120)
+          && isOptStr(data, 'raisedBy', 120)
+          && isOptStr(data, 'raisedAt', 40)
+          && data.status in ['Open', 'In review', 'Resolved']
+          && isOptStr(data, 'source', 60)
+          && isOptStr(data, 'reviewId', 128)
+          && isOptNum(data, 'decisionIndex')
+          && isOptStr(data, 'resolvedAt', 40)
+          && isOptStr(data, 'resolutionNote', 1000);
+      }
+
+      match /blockers/{blockerId} {
+        allow get: if isValidId(workspaceId) && isValidId(blockerId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(blockerId)
+          && isSignedIn()
+          && isValidBlocker(incoming(), blockerId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsNonAuditor(workspaceId);
+        allow update: if isValidId(workspaceId) && isValidId(blockerId)
+          && isSignedIn()
+          && isValidBlocker(incoming(), blockerId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly([
+              'targetType', 'targetId', 'scope', 'category', 'severity', 'summary', 'neededAction',
+              'owner', 'raisedBy', 'raisedAt', 'status', 'reviewId', 'decisionIndex', 'resolvedAt',
+              'resolutionNote', 'memberUids', 'updatedAt'
+            ])) ||
+            (isWsNonAuditor(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly([
+              'targetType', 'targetId', 'scope', 'category', 'severity', 'summary', 'neededAction',
+              'owner', 'raisedBy', 'raisedAt', 'status', 'reviewId', 'decisionIndex', 'resolvedAt',
+              'resolutionNote', 'updatedAt'
+            ]))
+          );
+        allow delete: if false;
+      }
+
+      // -----------------------------------------------------------------------
+      // PDCA Reviews
+      // -----------------------------------------------------------------------
+      function isValidReview(data, reviewId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'title', 'date', 'scope', 'decisions', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['id', 'workspaceId', 'ownerUid', 'memberUids', 'title', 'date', 'scope', 'notes', 'decisions', 'source', 'createdAt', 'updatedAt'])
+          && data.id == reviewId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isStr(data.title, 1, 200)
+          && isStr(data.date, 1, 40)
+          && isStr(data.scope, 1, 120)
+          && isOptStr(data, 'notes', 4000)
+          && data.decisions is list && data.decisions.size() <= 50
+          && isOptStr(data, 'source', 120);
+      }
+
+      match /reviews/{reviewId} {
+        allow get: if isValidId(workspaceId) && isValidId(reviewId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(reviewId)
+          && isSignedIn()
+          && isValidReview(incoming(), reviewId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsManagerOrDirector(workspaceId);
+        allow update: if isValidId(workspaceId) && isValidId(reviewId)
+          && isSignedIn()
+          && isValidReview(incoming(), reviewId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'date', 'scope', 'notes', 'decisions', 'memberUids', 'updatedAt'])) ||
+            (isWsManagerOrDirector(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'date', 'scope', 'notes', 'decisions', 'updatedAt']))
+          );
+        allow delete: if false;
+      }
+
+      // -----------------------------------------------------------------------
+      // Catchball Alignment Threads
+      // -----------------------------------------------------------------------
+      function isValidCatchball(data, cbId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'goal', 'status', 'origin', 'proposal', 'messages', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly([
+            'id', 'workspaceId', 'ownerUid', 'memberUids', 'goal', 'status', 'recipientScope', 'recipientRole',
+            'origin', 'turn', 'proposal', 'messages', 'createdDate', 'updatedDate', 'createdAt', 'updatedAt'
+          ])
+          && data.id == cbId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isValidId(data.goal)
+          && data.status in ['Draft', 'Awaiting director', 'Awaiting department', 'Changes requested', 'Aligned', 'Pending approval', 'Approved', 'Rejected', 'Cancelled']
+          && isOptStr(data, 'recipientScope', 120)
+          && isOptStr(data, 'recipientRole', 120)
+          && isStr(data.origin, 1, 120)
+          && isOptStr(data, 'turn', 120)
+          && data.proposal is map
+          && data.messages is list && data.messages.size() <= 50
+          && isOptStr(data, 'createdDate', 40)
+          && isOptStr(data, 'updatedDate', 40);
+      }
+
+      match /catchballs/{catchballId} {
+        allow get: if isValidId(workspaceId) && isValidId(catchballId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(catchballId)
+          && isSignedIn()
+          && isValidCatchball(incoming(), catchballId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsManagerOrDirector(workspaceId)
+          && (isWsLeadership(workspaceId) || incoming().status != 'Approved');
+        allow update: if isValidId(workspaceId) && isValidId(catchballId)
+          && isSignedIn()
+          && isValidCatchball(incoming(), catchballId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            isWsAdmin(workspaceId) ||
+            (
+              existing().status != 'Approved' && (
+                (isWsLeadership(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'turn', 'proposal', 'messages', 'updatedDate', 'updatedAt'])) ||
+                (isWsManagerOrDirector(workspaceId) && incoming().status != 'Approved' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'turn', 'proposal', 'messages', 'updatedDate', 'updatedAt']))
+              )
+            )
+          );
+        allow delete: if false;
+      }
+
+      // -----------------------------------------------------------------------
+      // Formal Approvals (Terminal Lock on Approved)
+      // -----------------------------------------------------------------------
+      function isValidApproval(data, appId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'goal', 'requester', 'approver', 'status', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly([
+            'id', 'workspaceId', 'ownerUid', 'memberUids', 'goal', 'catchballId', 'requester', 'approver',
+            'approvedBy', 'status', 'comment', 'date', 'resolvedAt', 'proposedTarget', 'proposedResources',
+            'createdAt', 'updatedAt'
+          ])
+          && data.id == appId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && isValidId(data.goal)
+          && isOptStr(data, 'catchballId', 128)
+          && isStr(data.requester, 1, 120)
+          && isStr(data.approver, 1, 120)
+          && isOptStr(data, 'approvedBy', 120)
+          && data.status in ['Pending', 'Approved', 'Changes requested', 'Superseded']
+          && isOptStr(data, 'comment', 1000)
+          && isOptStr(data, 'date', 40)
+          && isOptStr(data, 'resolvedAt', 40)
+          && isOptNum(data, 'proposedTarget')
+          && isOptStr(data, 'proposedResources', 1000);
+      }
+
+      match /approvals/{approvalId} {
+        allow get: if isValidId(workspaceId) && isValidId(approvalId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(approvalId)
+          && isSignedIn()
+          && isValidApproval(incoming(), approvalId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsManagerOrDirector(workspaceId)
+          && (isWsLeadership(workspaceId) || incoming().status == 'Pending');
+        allow update: if isValidId(workspaceId) && isValidId(approvalId)
+          && isSignedIn()
+          && isValidApproval(incoming(), approvalId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            isWsAdmin(workspaceId) ||
+            (
+              existing().status == 'Pending' &&
+              isWsLeadership(workspaceId) &&
+              incoming().diff(existing()).affectedKeys().hasOnly(['status', 'comment', 'resolvedAt', 'approvedBy', 'updatedAt'])
+            ) ||
+            (
+              existing().status == 'Pending' &&
+              isWsManagerOrDirector(workspaceId) &&
+              incoming().status == 'Superseded' &&
+              incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+            )
+          );
+        allow delete: if false;
+      }
+
+      // -----------------------------------------------------------------------
+      // Workspace Activities (History, Notifications, Revisions, CSV Imports)
+      // -----------------------------------------------------------------------
+      function isValidActivity(data, actId) {
+        return data.keys().hasAll(['id', 'workspaceId', 'ownerUid', 'memberUids', 'kind', 'payload', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['id', 'workspaceId', 'ownerUid', 'memberUids', 'kind', 'payload', 'read', 'createdAt', 'updatedAt'])
+          && data.id == actId
+          && data.workspaceId == workspaceId
+          && isValidId(data.id)
+          && isValidId(data.ownerUid)
+          && isValidMemberUids(data)
+          && data.kind in ['history', 'cbNotification', 'directorDecision', 'directorNotification', 'goalRevision', 'csvImport']
+          && data.payload is map
+          && (!('read' in data) || data.read is bool);
+      }
+
+      match /activities/{activityId} {
+        allow get: if isValidId(workspaceId) && isValidId(activityId) && isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow list: if isSignedIn() && (isBootstrappedAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+        allow create: if isValidId(workspaceId) && isValidId(activityId)
+          && isSignedIn()
+          && isValidActivity(incoming(), activityId)
+          && isImmutableCreate(incoming())
+          && wsExists(workspaceId)
+          && isWsNonAuditor(workspaceId);
+        allow update: if isValidId(workspaceId) && isValidId(activityId)
+          && isSignedIn()
+          && isValidActivity(incoming(), activityId)
+          && isImmutableUpdate(incoming(), existing())
+          && incoming().id == existing().id
+          && (
+            (isWsAdmin(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['read', 'memberUids', 'updatedAt'])) ||
+            (isWsManagerOrDirector(workspaceId) && incoming().diff(existing()).affectedKeys().hasOnly(['read', 'updatedAt']))
+          );
+        allow delete: if false;
+      }
+    }
+  }
+}
