@@ -40,12 +40,12 @@ const STATUS_TONE: Record<string, Tone> = {
 };
 
 const TONE_CLASSES: Record<Tone, string> = {
-  green: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/70',
-  amber: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/70',
-  red: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/70',
-  blue: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/70',
-  teal: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/60 dark:text-teal-300 dark:border-teal-800/70',
-  slate: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/80 dark:text-slate-300 dark:border-slate-700',
+  green: 'bg-emerald-500/10 text-emerald-800 border-emerald-600/20 dark:bg-emerald-400/10 dark:text-emerald-300 dark:border-emerald-400/20',
+  amber: 'bg-amber-500/10 text-amber-800 border-amber-600/25 dark:bg-amber-400/10 dark:text-amber-300 dark:border-amber-400/20',
+  red: 'bg-rose-500/10 text-rose-800 border-rose-600/20 dark:bg-rose-400/10 dark:text-rose-300 dark:border-rose-400/20',
+  blue: 'bg-sky-500/10 text-sky-800 border-sky-600/20 dark:bg-sky-400/10 dark:text-sky-300 dark:border-sky-400/20',
+  teal: 'bg-teal-600/10 text-teal-800 border-teal-700/20 dark:bg-teal-400/10 dark:text-teal-300 dark:border-teal-400/20',
+  slate: 'bg-[var(--surface-subtle)] text-[var(--muted)] border-[var(--border-strong)]/60',
 };
 
 export const StatusBadge: React.FC<{
@@ -77,10 +77,10 @@ export const SqdcStrip: React.FC<{
           const color =
             val === 2
               ? key === 'S'
-                ? 'bg-emerald-600 text-white border-emerald-700'
-                : 'bg-teal-600 text-white border-teal-700'
+                ? 'bg-emerald-700 text-white border-emerald-800 dark:bg-emerald-600 dark:border-emerald-500'
+                : 'bg-teal-700 text-white border-teal-800 dark:bg-teal-600 dark:border-teal-500'
               : val === 1
-                ? 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800'
+                ? 'bg-sky-500/10 text-sky-800 border-sky-600/25 dark:bg-sky-400/10 dark:text-sky-300 dark:border-sky-400/25'
                 : 'bg-[var(--surface-subtle)] text-[var(--muted)] border-[var(--border)]';
           return (
             <span
@@ -113,7 +113,7 @@ export const Card: React.FC<{
   children: React.ReactNode;
   className?: string;
 }> = ({ children, className = '' }) => (
-  <div className={`rounded-xl border border-[var(--border)] bg-[var(--surface)] ${className}`}>
+  <div className={`rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card-shadow)] ${className}`}>
     {children}
   </div>
 );
@@ -125,8 +125,8 @@ export const SectionHeader: React.FC<{
 }> = ({ title, subtitle, actions }) => (
   <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-[var(--border)]">
     <div className="min-w-0">
-      <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--ink)]">{title}</h1>
-      {subtitle && <p className="mt-1 text-xs sm:text-sm text-[var(--muted)] max-w-3xl">{subtitle}</p>}
+      <h1 className="text-xl sm:text-2xl font-bold tracking-[-0.015em] text-[var(--ink)]">{title}</h1>
+      {subtitle && <p className="mt-1 text-xs sm:text-sm text-[var(--muted)] max-w-3xl leading-relaxed">{subtitle}</p>}
     </div>
     {actions && <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>}
   </div>

@@ -148,7 +148,7 @@ export const ModalHost: React.FC = () => {
           )}
 
           {modal.items && modal.items.length > 0 && (
-            <ul className="space-y-1.5 rounded-lg border border-rose-200 bg-rose-50/70 p-3 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200 list-disc pl-6">
+            <ul className="space-y-1.5 rounded-lg border border-rose-600/20 bg-rose-500/10 p-3 text-xs text-rose-800 dark:border-rose-400/25 dark:bg-rose-400/10 dark:text-rose-200 list-disc pl-6">
               {modal.items.map((item, idx) => (
                 <li key={idx}>{item}</li>
               ))}
@@ -164,7 +164,7 @@ export const ModalHost: React.FC = () => {
                 value={promptVal}
                 onChange={(e) => setPromptVal(e.target.value)}
                 placeholder={modal.placeholder || 'Enter value...'}
-                className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-600/25 focus:border-teal-700 dark:focus:ring-teal-400/25 dark:focus:border-teal-400"
               />
             </div>
           )}
@@ -179,7 +179,7 @@ export const ModalHost: React.FC = () => {
                   step="any"
                   value={counterTarget}
                   onChange={(e) => setCounterTarget(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] tabular-nums focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] tabular-nums focus:outline-none focus:ring-2 focus:ring-teal-600/25 focus:border-teal-700 dark:focus:ring-teal-400/25 dark:focus:border-teal-400"
                 />
               </div>
               <div>
@@ -188,7 +188,7 @@ export const ModalHost: React.FC = () => {
                   type="text"
                   value={counterResources}
                   onChange={(e) => setCounterResources(e.target.value)}
-                  className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-600/25 focus:border-teal-700 dark:focus:ring-teal-400/25 dark:focus:border-teal-400"
                 />
               </div>
               <div>
@@ -198,7 +198,7 @@ export const ModalHost: React.FC = () => {
                   value={counterReason}
                   onChange={(e) => setCounterReason(e.target.value)}
                   placeholder="Explain trade-offs, capacity, or target assumptions..."
-                  className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-600/25 focus:border-teal-700 dark:focus:ring-teal-400/25 dark:focus:border-teal-400"
                 />
               </div>
             </div>
@@ -323,7 +323,7 @@ export const ModalHost: React.FC = () => {
             )}
             <button
               type="submit"
-              className="rounded-lg bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700"
+              className="rounded-lg bg-teal-700 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 cursor-pointer"
             >
               {modal.type === 'alert' ? 'OK' : modal.type === 'confirm' ? 'Confirm' : 'Save & Continue'}
             </button>

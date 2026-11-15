@@ -108,7 +108,7 @@ export const XMatrixPage: React.FC = () => {
             <button
               type="button"
               onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
               Print Matrix
@@ -123,7 +123,7 @@ export const XMatrixPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setSelection({ kind: 'none' })}
-              className="text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
+              className="text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline cursor-pointer"
             >
               Clear X-Matrix Highlight
             </button>
@@ -379,7 +379,7 @@ export const XMatrixPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate('goal', selection.id)}
-                  className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
+                  className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
                 >
                   Open Goal ↗
                 </button>
@@ -388,7 +388,7 @@ export const XMatrixPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate('initiative', selection.id)}
-                  className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
+                  className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
                 >
                   Open Initiative ↗
                 </button>
@@ -397,7 +397,7 @@ export const XMatrixPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate('kpis', selection.id)}
-                  className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
+                  className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
                 >
                   Open KPI Chart ↗
                 </button>
@@ -409,7 +409,7 @@ export const XMatrixPage: React.FC = () => {
         {selection.kind === 'cell' && (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-mono font-bold text-teal-600 dark:text-teal-400">
+              <div className="text-xs font-mono font-bold text-teal-700 dark:text-teal-400">
                 Intersection {selection.from} → {selection.to}
               </div>
               {selection.sector === 'bl' ? (
@@ -457,7 +457,7 @@ export const XMatrixPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => cycleKpiOwner(selection.from, selection.to)}
-                        className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
+                        className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
                       >
                         Cycle Owner Role
                       </button>
@@ -476,7 +476,7 @@ export const XMatrixPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => cycleMatrixRelation(selection.from, selection.to)}
-                        className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
+                        className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
                       >
                         Cycle Strength
                       </button>

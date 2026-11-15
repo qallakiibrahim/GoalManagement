@@ -7,9 +7,9 @@ export const FirestoreErrorBanner: React.FC = () => {
   if (!firestoreError) return null;
 
   return (
-    <div className="mx-4 mt-4 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs text-rose-900 dark:border-rose-800 dark:bg-rose-950/70 dark:text-rose-100 flex items-start justify-between gap-3 no-print">
+    <div className="mx-4 mt-4 rounded-xl border border-rose-600/25 bg-rose-500/10 px-4 py-3 text-xs text-rose-900 dark:border-rose-400/25 dark:bg-rose-400/10 dark:text-rose-100 flex items-start justify-between gap-3 no-print">
       <div className="flex items-start gap-2.5">
-        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-700 dark:text-rose-400" />
         <div>
           <div className="font-semibold">Workspace Sync Notice</div>
           <p className="mt-0.5 opacity-90">{firestoreError}</p>
@@ -18,7 +18,7 @@ export const FirestoreErrorBanner: React.FC = () => {
       <button
         type="button"
         onClick={clearFirestoreError}
-        className="rounded p-1 hover:bg-rose-200/50 dark:hover:bg-rose-900/50"
+        className="rounded p-1 hover:bg-rose-500/15 dark:hover:bg-rose-400/15 cursor-pointer"
         aria-label="Dismiss error"
       >
         <X className="w-3.5 h-3.5" />

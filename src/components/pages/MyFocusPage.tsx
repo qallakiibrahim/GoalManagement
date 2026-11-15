@@ -59,7 +59,7 @@ export const MyFocusPage: React.FC = () => {
         subtitle="Accountability cockpit linking X-Matrix KPIs, owned initiatives, daily pulse actions, and open PDCA exceptions."
         actions={
           <div className="flex items-center gap-2">
-            <Compass className="w-4 h-4 text-teal-600" />
+            <Compass className="w-4 h-4 text-teal-700 dark:text-teal-400" />
             <select
               value={currentOwner}
               onChange={(e) => setMyFocusOwner(e.target.value)}
@@ -84,7 +84,7 @@ export const MyFocusPage: React.FC = () => {
               key={k.id}
               type="button"
               onClick={() => navigate('kpis', k.id)}
-              className="text-left rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 hover:border-teal-500 transition-colors cursor-pointer space-y-1.5"
+              className="text-left rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card-shadow)] p-4 hover:border-teal-600/50 dark:hover:border-teal-400/50 transition-colors cursor-pointer space-y-1.5"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="font-mono text-xs font-bold text-[var(--muted)]">{k.id}</span>
@@ -112,7 +112,7 @@ export const MyFocusPage: React.FC = () => {
                   key={g.id}
                   type="button"
                   onClick={() => navigate('goal', g.id)}
-                  className="w-full text-left rounded-lg border border-[var(--border)] p-3 hover:border-teal-500 transition-colors flex items-center justify-between gap-3 cursor-pointer"
+                  className="w-full text-left rounded-lg border border-[var(--border)] p-3 hover:border-teal-600/50 dark:hover:border-teal-400/50 transition-colors flex items-center justify-between gap-3 cursor-pointer"
                 >
                   <div className="min-w-0">
                     <div className="text-xs font-bold text-[var(--ink)] truncate">
@@ -140,7 +140,7 @@ export const MyFocusPage: React.FC = () => {
                   key={i.id}
                   type="button"
                   onClick={() => navigate('initiative', i.id)}
-                  className="w-full text-left rounded-lg border border-[var(--border)] p-3 hover:border-teal-500 transition-colors space-y-2 cursor-pointer"
+                  className="w-full text-left rounded-lg border border-[var(--border)] p-3 hover:border-teal-600/50 dark:hover:border-teal-400/50 transition-colors space-y-2 cursor-pointer"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-xs font-bold text-[var(--ink)]">
@@ -166,7 +166,7 @@ export const MyFocusPage: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('daily')}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline cursor-pointer"
             >
               Daily Board
               <ArrowUpRight className="w-3.5 h-3.5" />
@@ -217,7 +217,7 @@ export const MyFocusPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => navigate('project', t.project)}
-                        className="font-mono text-teal-600 dark:text-teal-400 hover:underline mr-1.5 cursor-pointer"
+                        className="font-mono text-teal-700 dark:text-teal-400 hover:underline mr-1.5 cursor-pointer"
                       >
                         {t.project}
                       </button>

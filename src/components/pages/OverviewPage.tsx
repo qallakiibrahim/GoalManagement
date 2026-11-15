@@ -84,7 +84,7 @@ export const OverviewPage: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('matrix')}
-              className="rounded-lg bg-teal-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
+              className="rounded-lg bg-teal-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
             >
               Open X-Matrix
             </button>
@@ -154,7 +154,7 @@ export const OverviewPage: React.FC = () => {
                 key={pg.id}
                 type="button"
                 onClick={() => navigate('goal', pg.id)}
-                className="text-left rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 hover:border-teal-500 transition-colors space-y-2 cursor-pointer"
+                className="text-left rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card-shadow)] p-4 hover:border-teal-600/50 dark:hover:border-teal-400/50 transition-colors space-y-2 cursor-pointer"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono text-xs font-bold text-[var(--muted)]">{pg.id}</span>
@@ -192,9 +192,9 @@ export const OverviewPage: React.FC = () => {
                 key={item.step}
                 type="button"
                 onClick={() => navigate(item.route)}
-                className="rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)]/50 p-3 text-left hover:border-teal-500 transition-colors cursor-pointer"
+                className="rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)]/60 p-3 text-left hover:border-teal-600/50 dark:hover:border-teal-400/50 transition-colors cursor-pointer"
               >
-                <div className="text-[10px] font-mono font-bold text-teal-600 dark:text-teal-400">{item.step}</div>
+                <div className="text-[10px] font-mono font-bold text-teal-700 dark:text-teal-400">{item.step}</div>
                 <div className="text-xs font-bold text-[var(--ink)] mt-0.5">{item.label}</div>
                 <div className="text-[11px] text-[var(--muted)] mt-0.5">{item.meta}</div>
               </button>
@@ -340,7 +340,7 @@ export const OverviewPage: React.FC = () => {
                         key={c.id}
                         type="button"
                         onClick={() => navigate('catchballitem', c.id)}
-                        className="w-full text-left rounded-lg border border-[var(--border)] p-3 hover:border-teal-500 transition-colors cursor-pointer space-y-1"
+                        className="w-full text-left rounded-lg border border-[var(--border)] p-3 hover:border-teal-600/50 dark:hover:border-teal-400/50 transition-colors cursor-pointer space-y-1"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-mono text-[11px] font-bold text-[var(--muted)]">{c.id} · {c.goal}</span>
