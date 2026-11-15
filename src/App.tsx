@@ -1909,11 +1909,13 @@ function initSafeQMSEngine() {
       const riskCount = uGoals.filter((g: any) => g.performance === 'At risk').length;
       const uCards = (S.pulseCards || []).filter((c: any) => unitMatches(c.scope, u) && c.status !== 'Done').length;
       const uBlockers = (S.blockers || []).filter((b: any) => b.status !== 'Resolved' && unitMatches(b.scope, u)).length;
-      return `<div class="scorecard-tile" onclick="window.focusUnitDaily('${esc(u)}')" title="Click to open ${esc(u)} Tier 1 board">
+      const isActiveUnit = S.scope === u;
+      return `<div class="scorecard-tile ${isActiveUnit ? 'active' : ''}" onclick="window.focusUnitDaily('${esc(u)}')" title="Click to filter Tier 2 board by ${esc(u)}">
         <h3><span>${esc(u)}</span>${offCount ? badge('Off track') : riskCount ? badge('At risk') : badge('On track')}</h3>
         <div class="minirow">Goals: <b>${onCount}/${uGoals.length}</b> On track</div>
         <div class="minirow">Open Pulse Cards: <b>${uCards}</b></div>
         <div class="minirow">Escalated Blockers: <b style="color:${uBlockers ? 'var(--red)' : 'inherit'}">${uBlockers}</b></div>
+        <div class="actions no-print" style="margin-top:8px"><button type="button" class="btn xs" onclick="event.stopPropagation();window.openUnitTier1('${esc(u)}')">Open Tier 1 ↗</button></div>
       </div>`;
     }).join('')}</div>`;
 
@@ -3489,6 +3491,15 @@ function initSafeQMSEngine() {
   }
   (window as any).setDailyTier = (t: string) => { S.dailyTier = t; save(); render(); };
   (window as any).focusUnitDaily = (unit: string) => {
+    const allowedScopes = limitedRole() ? ['Organization', ASSIGNED_SITE, ASSIGNED_DEPARTMENT] : ['Organization', 'Site: Uppsala', 'Site: Falkenberg', 'Department: Production', 'Department: Maintenance', 'Department: Quality'];
+    const fallback = 'Organization';
+    if (allowedScopes.includes(unit)) {
+      S.scope = S.scope === unit ? fallback : unit;
+    }
+    save();
+    render();
+  };
+  (window as any).openUnitTier1 = (unit: string) => {
     const allowedScopes = limitedRole() ? ['Organization', ASSIGNED_SITE, ASSIGNED_DEPARTMENT] : ['Organization', 'Site: Uppsala', 'Site: Falkenberg', 'Department: Production', 'Department: Maintenance', 'Department: Quality'];
     if (allowedScopes.includes(unit)) S.scope = unit;
     S.dailyTier = 'tier1';

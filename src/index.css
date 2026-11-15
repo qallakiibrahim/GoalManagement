@@ -1207,6 +1207,7 @@ tr.click:hover { background: #f7fbfd; cursor: pointer; }
 .scorecard-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .scorecard-tile{border:1px solid var(--line);border-radius:8px;padding:13px;background:#fff;cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease}
 .scorecard-tile:hover{border-color:var(--teal);box-shadow:0 4px 12px rgba(10,30,50,.08)}
+.scorecard-tile.active{border-color:var(--teal);box-shadow:0 0 0 2px rgba(14,148,144,.22);background:rgba(14,148,144,.04)}
 .scorecard-tile h3{margin:0 0 6px;font-size:14px;color:var(--navy);display:flex;justify-content:space-between;align-items:center}
 
 :root[data-theme="dark"] .tierbtn{background:#152230;border-color:#2a3e54;color:#dce7f2}
@@ -1219,6 +1220,7 @@ tr.click:hover { background: #f7fbfd; cursor: pointer; }
 :root[data-theme="dark"] .pulse-add,:root[data-theme="dark"] .pulse-col{background:#111c28;border-color:#24384c}
 :root[data-theme="dark"] .pulse-card,:root[data-theme="dark"] .scorecard-tile{background:#162332;border-color:#283d52}
 :root[data-theme="dark"] .pulse-card:hover,:root[data-theme="dark"] .scorecard-tile:hover{border-color:#19bdb5;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+:root[data-theme="dark"] .scorecard-tile.active{border-color:#19bdb5;box-shadow:0 0 0 2px rgba(25,189,181,.26);background:#152c38}
 :root[data-theme="dark"] .pulse-card-title,:root[data-theme="dark"] .scorecard-tile h3{color:#edf5fc}
 :root[data-theme="dark"] .pulse-note{background:rgba(25,189,181,.12);color:#d7edf3}
 :root[data-theme="dark"] .pulse-delegate{background:#0f1924;border-color:#2a3e54}
