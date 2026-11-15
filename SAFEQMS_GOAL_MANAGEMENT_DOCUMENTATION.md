@@ -316,12 +316,13 @@ X-matrisen byggs som ett 4-kolumners × 3-raders CSS Grid (`.xm3-board`) med dyn
 - **KPI → Mål → PDCA:** Import av ett rött KPI-utfall sätter länkade mål till `Off track`, tänder `! Off` i X-matrisen och lägger till en `Auto Exception` i `PDCA Reviews`.
 - **Blocker-loop:** Eskalering från initiativ/KPI skapar blocker → konvertering i PDCA Review skapar beslut (`In review`) → klarmarkering av beslutet (`Done`) auto-löser blockern (`Resolved`).
 
-### 11.2 Synk-punkter att åtgärda i samband med produktionsbygge (från kodgranskning)
-Vid övergången till produktion (eller nästa sprint i prototypen) bör följande 6 synkroniseringspunkter byggas in direkt i affärslagret:
-1. **Goal Target ↔ KPI Monthly Targets:** Synka `goal.target` med `kpi.targets` vid Catchball-godkännande/målsparning (eller utvärdera målstatus per måls individuella target när flera mål delar KPI).
-2. **Task → Project → Initiative Roll-up:** Räkna om `project.progress` automatiskt från `tasks`, och lägg till redigering av `progress` och `status` på initiativsidan så att ett `At risk`-initiativ kan återställas när dess blocker lösts.
-3. **Enhetlig Mål ↔ Initiativ-koppling:** Strategy A3 och Audit Evidence Pack bör slå samman `initiative.goal` + `GoalRelationship` på samma sätt som X-matrisen.
-4. **Konsekvent Scope- & Årsfiltrering:** Filtrera `Escalated Blockers`-räknaren på Overview, `●/○`-räknarna per KPI i SE-vingen, tabellerna i `PDCA Reviews`/`Approvals` samt årsfiltret (`year`) enhetligt mot aktivt scope och år.
-5. **Blocker-sektion på Mål-sidan & Strikt RBAC på `toggleDecision`:** Visa `blockerSectionHtml('goal', id)` inne på målformuläret och lås både `toggleDecision` och SQDC-formuläret för skrivskyddade roller (`Auditor`/`Basic user`).
-6. **Konsistent Startdata (Seed):** Säkerställ att exempeldata inte har samma mål samtidigt `Approved` och i pågående `Pending`/`Awaiting`-kö.
+### 11.2 Verifierade Synk-punkter (Implementerade i prototypen & krav för produktion)
+Följande 6 end-to-end-synkroniseringsregler har verifierats och implementerats i prototypen och **måste** bevaras i produktionslagret:
+1. **Goal Target ↔ KPI Monthly Targets:** `syncKpiTargetsFromGoal()` synkar `goal.target` till `kpi.targets` från senaste mätta månad och framåt vid målsparning/Catchball-godkännande och räknar direkt om målstatus (`syncGoalPerformance()`). Strategy A3 Box 04 läser samma aktiva KPI-target.
+2. **Task → Project → Initiative Roll-up:** `syncExecutionProgress()` räknar automatiskt om `project.progress` från klickbara `tasks` (`Open → In progress → Done`) och rullar upp snittet till `initiative.progress` (med automatisk `Completed`-hantering vid 100 %). Initiativsidan stöder även redigering av `progress` och `status`.
+3. **Enhetlig Mål ↔ Initiativ-koppling:** Hjälpfunktionen `initiativeLinkedToGoal()` används enhetligt i X-Matrisen, Strategy A3 och Audit Evidence Pack (`i.goal` + `relations`).
+4. **Konsekvent Scope- & Rollfiltrering:** `Overview`-blockerräknaren, `Goal Cascade`, `●/○`-räknarna i SE-vingen, `PDCA Reviews`, `Management Review Inputs`, `Audit Evidence Pack` och `Approvals` filtreras enhetligt mot aktivt scope och användarroll.
+5. **Blocker-sektion på Mål-sidan & Strikt RBAC:** Målformuläret inkluderar `⚑ Escalate blocker` och `blockerSectionHtml('goal', id)`. Formulärlåsning (`rolePostRender`) och funktionskontroller (`roleCan`) spärrar obehöriga mutationer i både UI och handlers (`toggleDecision`, `saveGoal`, `saveInitiative`, `saveProjectA3`, `addTask`, `toggleTaskStatus`, `decide`, `revisePlan`).
+6. **Konsistent Startdata (Seed & Migrering):** `G-007` matchar `AP-001` (`Pending`), och `Safety Coordinator` har tilldelad SE-koppling till `K-008` så inga ledare saknar KPI-ansvar i X-Matrisen.
+
 
