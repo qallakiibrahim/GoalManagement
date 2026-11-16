@@ -8,6 +8,7 @@ import {
   parseCsvText,
   roleCan,
   visibleToRole,
+  xm4Ancestors,
 } from '../../domain/syncEngine';
 import { Card, SectionHeader, StatusBadge } from '../ui/Badge';
 import { ScopeBar } from '../ui/ScopeBar';
@@ -17,6 +18,8 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 export const KpisPage: React.FC = () => {
   const {
+    scope,
+    setScope,
     routeId,
     kpis,
     goals,
@@ -30,22 +33,59 @@ export const KpisPage: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string>('');
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
+  const scopedGoals = useMemo(() => {
+    const visibleGoals = goals.filter((g) => visibleToRole(g, activeRole));
+    if (scope === 'Organization') return visibleGoals;
+    return visibleGoals.filter(
+      (g) =>
+        g.level === scope ||
+        (scope.startsWith('Site:') && xm4Ancestors(goals, g).some((a) => a.level === scope))
+    );
+  }, [goals, scope, activeRole]);
+
   const allowedKpis = useMemo(() => {
-    if (activeRole === 'Department director' || activeRole === 'Basic user' || activeRole === 'Auditor') {
-      const visibleGoalKpis = new Set(
-        goals.filter((g) => visibleToRole(g, activeRole)).map((g) => g.kpi).filter(Boolean)
-      );
-      const list = kpis.filter((k) => visibleGoalKpis.has(k.id));
-      return list.length ? list : kpis;
+    if (scope === 'Organization') {
+      if (activeRole === 'Department director' || activeRole === 'Basic user' || activeRole === 'Auditor') {
+        const roleKpiIds = new Set(scopedGoals.map((g) => g.kpi).filter(Boolean));
+        const list = kpis.filter((k) => roleKpiIds.has(k.id));
+        return list.length ? list : kpis;
+      }
+      return kpis;
     }
-    return kpis;
-  }, [kpis, goals, activeRole]);
+    const scopedKpiIds = new Set(scopedGoals.map((g) => g.kpi).filter(Boolean));
+    return kpis.filter((k) => scopedKpiIds.has(k.id));
+  }, [kpis, scopedGoals, scope, activeRole]);
 
   const activeKpi =
     kpiById(allowedKpis, routeId) || kpiById(allowedKpis, selectedId) || allowedKpis[0];
 
+  const linkedGoalsForActive = useMemo(() => {
+    if (!activeKpi) return [];
+    return scopedGoals.filter((g) => g.kpi === activeKpi.id);
+  }, [scopedGoals, activeKpi]);
+
   if (!activeKpi) {
-    return <Card className="p-6 text-xs text-[var(--muted)]">No KPIs configured in this workspace.</Card>;
+    return (
+      <div className="space-y-6">
+        <SectionHeader
+          title="KPIs &amp; 12-Month Bowling Chart"
+          subtitle="Monthly performance tracking synchronized with Goal Targets, CSV Imports, and Automated Exception Detection."
+        />
+        <ScopeBar showYear={false} />
+        <Card className="p-6 text-xs text-[var(--muted)] flex flex-wrap items-center justify-between gap-3">
+          <span>No KPIs are linked to goals in {scope}.</span>
+          {scope !== 'Organization' && (
+            <button
+              type="button"
+              onClick={() => setScope('Organization')}
+              className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1.5 font-semibold text-[var(--ink)] hover:bg-[var(--surface-subtle)] cursor-pointer"
+            >
+              Show Organization KPIs
+            </button>
+          )}
+        </Card>
+      </div>
+    );
   }
 
   const st = computeKpiStatus(activeKpi);
@@ -110,7 +150,7 @@ export const KpisPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => recordKpiActual(activeKpi.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Record Next Month
@@ -120,7 +160,7 @@ export const KpisPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => escalateBlocker('kpi', activeKpi.id)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-600/25 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-500/15 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300 cursor-pointer"
               >
                 <Flag className="w-3.5 h-3.5" />
                 Escalate Blocker
@@ -130,7 +170,17 @@ export const KpisPage: React.FC = () => {
         }
       />
 
-      <ScopeBar />
+      <ScopeBar
+        showYear={false}
+        rightContent={
+          <span className="text-xs text-[var(--muted)]">
+            {allowedKpis.length} KPI{allowedKpis.length === 1 ? '' : 's'} in {scope}
+            {linkedGoalsForActive.length > 0
+              ? ` · Linked: ${linkedGoalsForActive.map((g) => g.id).join(', ')}`
+              : ''}
+          </span>
+        }
+      />
 
       {/* 4 KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -177,7 +227,7 @@ export const KpisPage: React.FC = () => {
             <h2 className="text-sm font-bold text-[var(--ink)]">
               {activeKpi.id} · {activeKpi.name} ({activeKpi.unit})
             </h2>
-            <p className="text-xs text-[var(--muted)]">Solid teal = Actual performance · Dashed slate = Target trajectory</p>
+            <p className="text-xs text-[var(--muted)]">Solid line = Actual performance · Dashed line = Target trajectory</p>
           </div>
           {hoverIdx !== null && (
             <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface-subtle)] px-3 py-1 text-xs font-mono tabular-nums">
@@ -369,7 +419,7 @@ export const CsvImportPage: React.FC = () => {
                 const ok = await commitCsvImport(parsed.records);
                 if (ok) navigate('kpis');
               }}
-              className="rounded-lg bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50 cursor-pointer"
+              className="rounded-lg bg-teal-700 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors disabled:opacity-50 cursor-pointer"
             >
               Commit {parsed.records.length} Rows
             </button>
