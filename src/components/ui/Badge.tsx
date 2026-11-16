@@ -63,34 +63,61 @@ export const StatusBadge: React.FC<{
   );
 };
 
+const SQDC_PILLARS = [
+  {
+    key: 'S',
+    label: 'Safety',
+    primary: 'bg-emerald-700 text-white border-emerald-800 dark:bg-emerald-600 dark:border-emerald-500',
+    secondary: 'bg-emerald-500/12 text-emerald-800 border-emerald-600/30 dark:bg-emerald-400/12 dark:text-emerald-300 dark:border-emerald-400/30',
+  },
+  {
+    key: 'Q',
+    label: 'Quality',
+    primary: 'bg-sky-700 text-white border-sky-800 dark:bg-sky-600 dark:border-sky-500',
+    secondary: 'bg-sky-500/12 text-sky-800 border-sky-600/30 dark:bg-sky-400/12 dark:text-sky-300 dark:border-sky-400/30',
+  },
+  {
+    key: 'D',
+    label: 'Delivery',
+    primary: 'bg-indigo-700 text-white border-indigo-800 dark:bg-indigo-600 dark:border-indigo-500',
+    secondary: 'bg-indigo-500/12 text-indigo-800 border-indigo-600/30 dark:bg-indigo-400/12 dark:text-indigo-300 dark:border-indigo-400/30',
+  },
+  {
+    key: 'C',
+    label: 'Cost',
+    primary: 'bg-amber-700 text-white border-amber-800 dark:bg-amber-600 dark:border-amber-500',
+    secondary: 'bg-amber-500/12 text-amber-800 border-amber-600/30 dark:bg-amber-400/12 dark:text-amber-300 dark:border-amber-400/30',
+  },
+] as const;
+
 export const SqdcStrip: React.FC<{
   initiative: Initiative;
   compact?: boolean;
 }> = ({ initiative, compact = false }) => {
   const { s, weighted } = sqdcScore(initiative);
-  const letters = ['S', 'Q', 'D', 'C'] as const;
   return (
-    <div className="inline-flex items-center gap-1.5 flex-wrap">
+    <div className="inline-flex items-center gap-2 flex-wrap">
       <div className="inline-flex items-center gap-1">
-        {letters.map((key) => {
+        {SQDC_PILLARS.map(({ key, label, primary, secondary }) => {
           const val = Number(s[key] || 0);
           const color =
             val === 2
-              ? key === 'S'
-                ? 'bg-emerald-700 text-white border-emerald-800 dark:bg-emerald-600 dark:border-emerald-500'
-                : 'bg-teal-700 text-white border-teal-800 dark:bg-teal-600 dark:border-teal-500'
+              ? primary
               : val === 1
-                ? 'bg-sky-500/10 text-sky-800 border-sky-600/25 dark:bg-sky-400/10 dark:text-sky-300 dark:border-sky-400/25'
-                : 'bg-[var(--surface-subtle)] text-[var(--muted)] border-[var(--border)]';
+                ? secondary
+                : 'bg-[var(--surface-subtle)] text-[var(--muted)]/60 border-[var(--border)]';
           return (
             <span
               key={key}
-              title={`${key}: ${val === 2 ? 'Primary' : val === 1 ? 'Secondary' : 'None'}`}
-              className={`inline-flex items-center justify-center rounded border text-[10px] font-bold font-mono ${
-                compact ? 'w-5 h-5' : 'w-6 h-5'
+              title={`${label} (${key}): ${val === 2 ? 'Primary (2)' : val === 1 ? 'Secondary (1)' : 'None (0)'}`}
+              className={`inline-flex items-center justify-center rounded border text-[10px] font-bold font-mono tabular-nums ${
+                compact ? 'w-5 h-5' : 'px-1.5 h-5 gap-0.5 min-w-[26px]'
               } ${color}`}
             >
-              {key}
+              <span>{key}</span>
+              {!compact && val > 0 && (
+                <span className="text-[9px] font-semibold opacity-85">{val}</span>
+              )}
             </span>
           );
         })}
@@ -101,7 +128,7 @@ export const SqdcStrip: React.FC<{
         </span>
       )}
       {initiative.isBottleneck && (
-        <span className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+        <span className="inline-flex items-center rounded border border-amber-600/25 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300">
           TOC Bottleneck
         </span>
       )}

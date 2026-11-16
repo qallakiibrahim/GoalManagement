@@ -261,7 +261,7 @@ export const XMatrixPage: React.FC = () => {
 
           {/* SE Header */}
           <div className="xm3-ownerwinghead">
-            <div className="text-xs font-bold text-violet-700 dark:text-violet-300">Cross-Functional Ownership</div>
+            <div className="text-xs font-bold text-[var(--owner)]">Cross-Functional Ownership</div>
             <div className="text-[11px] text-[var(--muted)]">Accountable KPI Leaders &amp; Support</div>
           </div>
 

@@ -353,7 +353,7 @@ export const DailyBoardPage: React.FC = () => {
                 }}
                 className={`rounded-xl border p-3.5 space-y-3 min-h-[260px] transition-colors ${
                   isOver
-                    ? 'border-teal-500 bg-teal-50/40 dark:bg-teal-950/30'
+                    ? 'border-teal-600 bg-teal-600/10 dark:border-teal-400 dark:bg-teal-400/10'
                     : 'border-[var(--border)] bg-[var(--surface-subtle)]/40'
                 }`}
               >
@@ -416,7 +416,7 @@ export const DailyBoardPage: React.FC = () => {
                         </div>
 
                         {c.delegatedBy && (
-                          <div className="rounded bg-sky-50 px-2 py-1 text-[11px] text-sky-800 dark:bg-sky-950/50 dark:text-sky-300">
+                          <div className="rounded bg-sky-500/10 px-2 py-1 text-[11px] text-sky-800 dark:bg-sky-400/10 dark:text-sky-300">
                             Delegated by {c.delegatedBy} ({c.delegatedAt})
                           </div>
                         )}
@@ -435,7 +435,7 @@ export const DailyBoardPage: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => escalatePulseCard(c.id)}
-                                className="rounded border border-rose-300 bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-800 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300 cursor-pointer"
+                                className="rounded border border-rose-600/25 bg-rose-500/10 px-2 py-0.5 text-[11px] font-semibold text-rose-800 hover:bg-rose-500/15 dark:border-rose-400/25 dark:bg-rose-400/10 dark:text-rose-300 cursor-pointer"
                               >
                                 ↑ Escalate
                               </button>
@@ -550,7 +550,7 @@ export const DailyBoardPage: React.FC = () => {
                 onClick={() => setDailyTier(t.id)}
                 className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
                   dailyTier === t.id
-                    ? 'bg-teal-600 text-white'
+                    ? 'bg-teal-700 text-white dark:bg-teal-600'
                     : 'text-[var(--muted)] hover:text-[var(--ink)]'
                 }`}
               >
@@ -796,7 +796,7 @@ export const DailyBoardPage: React.FC = () => {
                         await setScope(sc);
                         setDailyTier('tier1');
                       }}
-                      className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
+                      className="inline-flex items-center gap-1 rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
                     >
                       Open Tier 1
                       <ArrowUpRight className="w-3.5 h-3.5" />
