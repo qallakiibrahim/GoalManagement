@@ -111,8 +111,13 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       return false;
     }
   });
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const toggleSection = (title: string) => {
+    setOpenSections((prev) => ({ ...prev, [title]: !prev[title] }));
+  };
 
   const toggleSidebarCollapsed = () => {
     setSidebarCollapsed((prev) => {
@@ -265,10 +270,17 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       ? activities.filter((a) => a.kind === 'directorNotification' && !a.read)
       : [];
 
+  const isNavItemActive = (itemRoute: AppRoute) =>
+    route === itemRoute ||
+    (itemRoute === 'cascade' && (route === 'goal' || route === 'newgoal')) ||
+    (itemRoute === 'projects' && (route === 'initiative' || route === 'newinitiative' || route === 'project')) ||
+    (itemRoute === 'catchball' && (route === 'catchballnew' || route === 'catchballitem')) ||
+    (itemRoute === 'reviews' && (route === 'review' || route === 'newreview'));
+
   const renderNavList = (collapsed: boolean) => (
-    <nav className={`flex-1 overflow-y-auto ${collapsed ? 'px-2 py-3 space-y-3' : 'px-3 py-4 space-y-5'}`}>
+    <nav className={`flex-1 overflow-y-auto ${collapsed ? 'px-2 py-3 space-y-3' : 'px-3 py-3 space-y-1.5'}`}>
       {!collapsed && workspaces.length > 1 && (
-        <div className="px-2">
+        <div className="px-2 pb-2">
           <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] mb-1">
             Active Workspace
           </label>
@@ -289,50 +301,78 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       {sections
         .map((sec) => ({ ...sec, visibleItems: sec.items.filter((i) => !i.hidden) }))
         .filter((sec) => sec.visibleItems.length > 0)
-        .map((sec, secIdx) => (
-          <div key={sec.title} className="space-y-1">
-            {!collapsed ? (
-              <div className="px-2.5 text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                {sec.title}
-              </div>
-            ) : (
-              secIdx > 0 && <div className="mx-2 my-1 border-t border-[var(--border)]" />
-            )}
-            <div className="space-y-0.5">
-              {sec.visibleItems.map((item) => {
-                const Icon = item.icon;
-                const isActive =
-                  route === item.route ||
-                  (item.route === 'cascade' && (route === 'goal' || route === 'newgoal')) ||
-                  (item.route === 'projects' && (route === 'initiative' || route === 'newinitiative' || route === 'project')) ||
-                  (item.route === 'catchball' && (route === 'catchballnew' || route === 'catchballitem')) ||
-                  (item.route === 'reviews' && (route === 'review' || route === 'newreview'));
-                return (
-                  <button
-                    key={item.route}
-                    type="button"
-                    title={collapsed ? item.label : undefined}
-                    aria-label={item.label}
-                    onClick={() => {
-                      navigate(item.route);
-                      setMobileOpen(false);
-                    }}
-                    className={`w-full flex items-center rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                      collapsed ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-2.5 py-2'
-                    } ${
-                      isActive
-                        ? 'bg-teal-600/10 text-teal-800 ring-1 ring-inset ring-teal-700/15 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-400/20'
+        .map((sec, secIdx) => {
+          const isOpen = !!openSections[sec.title];
+          const hasActiveItem = sec.visibleItems.some((item) => isNavItemActive(item.route));
+          const showItems = collapsed || isOpen;
+
+          return (
+            <div key={sec.title} className={collapsed ? 'space-y-1' : 'space-y-1'}>
+              {!collapsed ? (
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  onClick={() => toggleSection(sec.title)}
+                  className={`w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+                    hasActiveItem && !isOpen
+                      ? 'text-teal-700 bg-teal-600/8 dark:text-teal-300 dark:bg-teal-400/10'
+                      : isOpen
+                        ? 'text-[var(--ink)] bg-[var(--surface-subtle)]/60'
                         : 'text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    <span className="truncate">{sec.title}</span>
+                    {hasActiveItem && !isOpen && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-teal-600 dark:bg-teal-400 shrink-0"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${
+                      isOpen ? 'rotate-180' : ''
                     }`}
-                  >
-                    <Icon className={`${collapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'} shrink-0`} />
-                    {!collapsed && <span className="truncate">{item.label}</span>}
-                  </button>
-                );
-              })}
+                  />
+                </button>
+              ) : (
+                secIdx > 0 && <div className="mx-2 my-1 border-t border-[var(--border)]" />
+              )}
+
+              {showItems && (
+                <div className={`space-y-0.5 ${!collapsed ? 'pb-1.5' : ''}`}>
+                  {sec.visibleItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = isNavItemActive(item.route);
+                    return (
+                      <button
+                        key={item.route}
+                        type="button"
+                        title={collapsed ? item.label : undefined}
+                        aria-label={item.label}
+                        onClick={() => {
+                          navigate(item.route);
+                          setMobileOpen(false);
+                        }}
+                        className={`w-full flex items-center rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                          collapsed ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-2.5 py-2'
+                        } ${
+                          isActive
+                            ? 'bg-teal-600/10 text-teal-800 ring-1 ring-inset ring-teal-700/15 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-400/20'
+                            : 'text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)]'
+                        }`}
+                      >
+                        <Icon className={`${collapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'} shrink-0`} />
+                        {!collapsed && <span className="truncate">{item.label}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
     </nav>
   );
 
