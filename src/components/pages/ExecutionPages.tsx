@@ -14,6 +14,7 @@ import {
 import { Card, SectionHeader, SqdcStrip, StatusBadge } from '../ui/Badge';
 import { ScopeBar } from '../ui/ScopeBar';
 import { BlockerSection } from '../ui/BlockerPanel';
+import { HelpTip } from '../ui/HelpTip';
 
 export const ProjectsListPage: React.FC = () => {
   const { scope, goals, initiatives, projects, activeRole, navigate } = useWorkspace();
@@ -130,6 +131,7 @@ export const ProjectsListPage: React.FC = () => {
       </div>
 
       {/* Initiatives Table */}
+      <div data-tour="initiatives-table">
       <Card className="overflow-hidden">
         <div className="px-5 py-4 border-b border-[var(--border)]">
           <h2 className="text-sm font-bold text-[var(--ink)]">Strategic Initiatives ({visInits.length})</h2>
@@ -181,6 +183,7 @@ export const ProjectsListPage: React.FC = () => {
           </table>
         </div>
       </Card>
+      </div>
 
       {/* Projects & A3 Table */}
       <Card className="overflow-hidden">
@@ -395,7 +398,7 @@ export const InitiativeFormPage: React.FC = () => {
 };
 
 export const InitiativeDetailPage: React.FC = () => {
-  const { routeId, initiatives, goals, projects, activeRole, updateInitiativeFocus, navigate } = useWorkspace();
+  const { routeId, initiatives, goals, projects, activeRole, updateInitiativeFocus, createProjectA3, navigate } = useWorkspace();
   const init = initById(initiatives, routeId);
 
   const [progress, setProgress] = useState(0);
@@ -403,6 +406,10 @@ export const InitiativeDetailPage: React.FC = () => {
   const [valueStream, setValueStream] = useState('');
   const [isBottleneck, setIsBottleneck] = useState(false);
   const [sqdc, setSqdc] = useState<SqdcMatrix>({ S: 0, Q: 0, D: 0, C: 0 });
+  const [showNewA3, setShowNewA3] = useState(false);
+  const [newA3Title, setNewA3Title] = useState('');
+  const [newA3Owner, setNewA3Owner] = useState('');
+  const [newA3Tier, setNewA3Tier] = useState<EscalationTier>('Full A3');
 
   useEffect(() => {
     if (init) {
@@ -454,7 +461,15 @@ export const InitiativeDetailPage: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
-              <label className="block font-semibold text-[var(--muted)] mb-1">Execution %</label>
+              <label className="flex items-center gap-1.5 font-semibold text-[var(--muted)] mb-1">
+                <span>Execution %</span>
+                <HelpTip
+                  title="Projektframdrift (%) ≠ KPI-måluppfyllelse"
+                  body="Execution % mäter hur stor andel av initiativets och tillhörande Project A3-uppgifter som slutförts. När du bockar av ProjectTasks räknas procenten om automatiskt."
+                  note="100 % genomförda projektuppgifter bevisar att åtgärden är utförd — om den faktiskt gav önskad effekt bevisas först av KPI-utfallet i Bowling Chart."
+                  chapterId={6}
+                />
+              </label>
               <input
                 type="number"
                 min={0}
@@ -550,7 +565,95 @@ export const InitiativeDetailPage: React.FC = () => {
         </Card>
 
         <Card className="p-5 space-y-3">
-          <h2 className="text-sm font-bold text-[var(--ink)]">Child Project A3s ({childProjects.length})</h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-bold text-[var(--ink)]">Child Project A3s ({childProjects.length})</h2>
+            {canWrite && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNewA3Owner((prev) => prev || init.owner);
+                  setShowNewA3((prev) => !prev);
+                }}
+                className="inline-flex items-center gap-1 rounded-lg bg-teal-700 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+                New Project A3
+              </button>
+            )}
+          </div>
+
+          {showNewA3 && canWrite && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!newA3Title.trim()) return;
+                const createdId = await createProjectA3({
+                  initiative: init.id,
+                  title: newA3Title.trim(),
+                  owner: newA3Owner.trim() || init.owner,
+                  escalationTier: newA3Tier,
+                });
+                if (createdId) {
+                  setNewA3Title('');
+                  setShowNewA3(false);
+                  navigate('project', createdId);
+                }
+              }}
+              className="rounded-lg border border-teal-600/30 bg-[var(--surface-subtle)]/60 p-3 space-y-2.5 text-xs"
+            >
+              <div>
+                <label className="block font-semibold text-[var(--muted)] mb-1">Project A3 Title</label>
+                <input
+                  type="text"
+                  required
+                  value={newA3Title}
+                  onChange={(e) => setNewA3Title(e.target.value)}
+                  placeholder="e.g. Line 3 SMED Changeover Reduction"
+                  className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-[var(--muted)] mb-1">Owner</label>
+                  <input
+                    type="text"
+                    value={newA3Owner}
+                    onChange={(e) => setNewA3Owner(e.target.value)}
+                    placeholder={init.owner}
+                    className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-[var(--muted)] mb-1">Tier</label>
+                  <select
+                    value={newA3Tier}
+                    onChange={(e) => setNewA3Tier(e.target.value as EscalationTier)}
+                    className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2 py-1.5"
+                  >
+                    <option value="Full A3">Full A3</option>
+                    <option value="5-Why">5-Why</option>
+                    <option value="Quick Fix">Quick Fix</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewA3(false)}
+                  className="rounded-lg border border-[var(--border-strong)] px-2.5 py-1 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-teal-700 px-3 py-1 font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 cursor-pointer"
+                >
+                  Create &amp; Open A3
+                </button>
+              </div>
+            </form>
+          )}
+
           {childProjects.length === 0 ? (
             <p className="text-xs text-[var(--muted)]">No project A3 sheets linked yet.</p>
           ) : (
@@ -716,6 +819,11 @@ export const ProjectA3Page: React.FC = () => {
         <div className="flex items-center gap-2 text-xs">
           <Layers className="w-4 h-4 text-teal-600" />
           <span className="font-bold text-[var(--ink)]">Problem-Solving Escalation Tier:</span>
+          <HelpTip
+            title="Välj rätt djup: Direct Fix, 5-Why eller Full A3"
+            body="Direct Fix används för enkla avvikelser med känd orsak. 5-Why lägger till strukturerad rotårsaksanalys. Full A3 aktiverar hela det utskrivbara A3-bladet med bakgrund, nuläge, målläge, rotårsak, motåtgärder och lärdomar."
+            chapterId={6}
+          />
           <span className="text-[var(--muted)]">
             Match documentation depth to issue complexity
           </span>

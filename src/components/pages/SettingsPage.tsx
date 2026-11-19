@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Copy, Download, Plus, RefreshCw, Shield, Trash2, Users } from 'lucide-react';
-import { ALL_SCOPES, ASSIGNED_DEPARTMENT, ASSIGNED_SITE, SAFEQMS_ROLES, SafeQmsRole } from '../../types/safeqms';
+import { Copy, Download, Plus, RefreshCw, Rocket, Shield, Trash2, Users } from 'lucide-react';
+import { ALL_SCOPES, ASSIGNED_DEPARTMENT, ASSIGNED_SITE, SAFEQMS_ROLES, SafeQmsRole, formatRoleLabel } from '../../types/safeqms';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { Card, SectionHeader, StatusBadge } from '../ui/Badge';
 
@@ -25,6 +25,7 @@ export const SettingsPage: React.FC = () => {
     updateTeamMember,
     removeTeamMember,
     createWorkspace,
+    createBlankWorkspace,
     switchWorkspace,
     seedOrResetWorkspace,
     toast,
@@ -40,7 +41,7 @@ export const SettingsPage: React.FC = () => {
   if (!isActualAdmin) {
     return (
       <Card className="p-6 text-xs text-[var(--muted)]">
-        Workspace administration and team role management require the <strong>Administratör</strong> role.
+        Workspace administration and team role management require the <strong>Administrator</strong> role.
       </Card>
     );
   }
@@ -158,7 +159,7 @@ export const SettingsPage: React.FC = () => {
                       >
                         {SAFEQMS_ROLES.map((r) => (
                           <option key={r} value={r}>
-                            {r}
+                            {formatRoleLabel(r)}
                           </option>
                         ))}
                       </select>
@@ -254,7 +255,7 @@ export const SettingsPage: React.FC = () => {
           >
             {SAFEQMS_ROLES.map((r) => (
               <option key={r} value={r}>
-                {r}
+                {formatRoleLabel(r)}
               </option>
             ))}
           </select>
@@ -330,18 +331,35 @@ export const SettingsPage: React.FC = () => {
               await createWorkspace(newWsName);
               setNewWsName('');
             }}
-            className="flex gap-2 pt-2 border-t border-[var(--border)] text-xs"
+            className="space-y-2.5 pt-2 border-t border-[var(--border)] text-xs"
           >
             <input
               type="text"
               value={newWsName}
               onChange={(e) => setNewWsName(e.target.value)}
-              placeholder="New workspace name (e.g. Falkenberg Site 2028)..."
-              className="flex-1 rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2"
+              placeholder="New workspace name (e.g. Nordiska Verkstad AB 2027)..."
+              className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2"
             />
-            <button type="submit" className="rounded-lg bg-teal-700 px-3.5 py-2 font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer">
-              Create Workspace
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  const targetName = newWsName.trim() || 'Ny kund · Arbetsyta 2027';
+                  await createBlankWorkspace(targetName);
+                  setNewWsName('');
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3.5 py-2 font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
+              >
+                <Rocket className="w-3.5 h-3.5" />
+                Skapa tom (Från noll)
+              </button>
+              <button
+                type="submit"
+                className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 font-semibold text-[var(--ink)] hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer"
+              >
+                Create Demo Workspace
+              </button>
+            </div>
           </form>
         </Card>
 

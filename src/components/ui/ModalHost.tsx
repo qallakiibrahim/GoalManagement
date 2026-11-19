@@ -16,6 +16,8 @@ export const ModalHost: React.FC = () => {
   const [pdcaText, setPdcaText] = useState('');
   const [pdcaOwner, setPdcaOwner] = useState('');
   const [pdcaDue, setPdcaDue] = useState('');
+  const [kpiActualInput, setKpiActualInput] = useState('');
+  const [kpiTargetInput, setKpiTargetInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
@@ -33,6 +35,12 @@ export const ModalHost: React.FC = () => {
     setPdcaText(modal.defaultValue || '');
     setPdcaOwner(modal.defaultOwner || '');
     setPdcaDue(modal.defaultDue || '');
+    setKpiActualInput(
+      modal.kpiMonth?.actual !== null && modal.kpiMonth?.actual !== undefined ? String(modal.kpiMonth.actual) : ''
+    );
+    setKpiTargetInput(
+      modal.kpiMonth?.target !== null && modal.kpiMonth?.target !== undefined ? String(modal.kpiMonth.target) : ''
+    );
   }, [modal]);
 
   useEffect(() => {
@@ -113,6 +121,23 @@ export const ModalHost: React.FC = () => {
         text: pdcaText.trim(),
         owner: pdcaOwner.trim(),
         due: pdcaDue.trim(),
+      });
+      return;
+    }
+    if (modal.type === 'kpiMonth') {
+      const aTrim = kpiActualInput.trim();
+      const tTrim = kpiTargetInput.trim();
+      if (aTrim !== '' && !Number.isFinite(Number(aTrim))) {
+        setErrorMsg('Actual must be a valid number or left blank.');
+        return;
+      }
+      if (tTrim !== '' && !Number.isFinite(Number(tTrim))) {
+        setErrorMsg('Target must be a valid number or left blank.');
+        return;
+      }
+      closeModal({
+        actual: aTrim === '' ? null : Number(aTrim),
+        target: tTrim === '' ? null : Number(tTrim),
       });
     }
   };
@@ -309,6 +334,50 @@ export const ModalHost: React.FC = () => {
             </div>
           )}
 
+          {modal.type === 'kpiMonth' && modal.kpiMonth && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
+                    Actual ({modal.kpiMonth.unit || 'value'})
+                  </label>
+                  <input
+                    autoFocus
+                    type="number"
+                    step="any"
+                    value={kpiActualInput}
+                    onChange={(e) => setKpiActualInput(e.target.value)}
+                    placeholder="Leave blank to clear"
+                    className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm font-mono tabular-nums text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-600/25 focus:border-teal-700 dark:focus:ring-teal-400/25 dark:focus:border-teal-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
+                    Target ({modal.kpiMonth.unit || 'value'})
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={kpiTargetInput}
+                    onChange={(e) => setKpiTargetInput(e.target.value)}
+                    placeholder="Leave blank to clear"
+                    className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm font-mono tabular-nums text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-600/25 focus:border-teal-700 dark:focus:ring-teal-400/25 dark:focus:border-teal-400"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-[var(--muted)]">
+                <span>Leave Actual blank if this month is not yet reported.</span>
+                <button
+                  type="button"
+                  onClick={() => closeModal({ actual: null, target: null })}
+                  className="font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
+                >
+                  Clear month
+                </button>
+              </div>
+            </div>
+          )}
+
           {errorMsg && <p className="text-xs font-medium text-rose-600 dark:text-rose-400">{errorMsg}</p>}
 
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border)]">
@@ -316,7 +385,7 @@ export const ModalHost: React.FC = () => {
               <button
                 type="button"
                 onClick={cancel}
-                className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--surface-subtle)]"
+                className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--surface-subtle)] cursor-pointer"
               >
                 Cancel
               </button>
@@ -325,7 +394,13 @@ export const ModalHost: React.FC = () => {
               type="submit"
               className="rounded-lg bg-teal-700 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 cursor-pointer"
             >
-              {modal.type === 'alert' ? 'OK' : modal.type === 'confirm' ? 'Confirm' : 'Save & Continue'}
+              {modal.type === 'alert'
+                ? 'OK'
+                : modal.type === 'confirm'
+                  ? 'Confirm'
+                  : modal.type === 'kpiMonth'
+                    ? 'Save Month'
+                    : 'Save & Continue'}
             </button>
           </div>
         </form>

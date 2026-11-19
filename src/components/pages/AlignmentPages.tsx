@@ -15,6 +15,7 @@ import {
 import { Card, SectionHeader, StatusBadge } from '../ui/Badge';
 import { ScopeBar } from '../ui/ScopeBar';
 import { BlockerBox } from '../ui/BlockerPanel';
+import { HelpTip } from '../ui/HelpTip';
 
 export const CatchballListPage: React.FC = () => {
   const { catchballs, goals, activeRole, navigate } = useWorkspace();
@@ -39,7 +40,7 @@ export const CatchballListPage: React.FC = () => {
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div data-tour="catchball-list" className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {visible.map((c) => {
           const g = goalById(goals, c.goal);
           const turn = cbTurn(c);
@@ -245,7 +246,18 @@ export const CatchballDetailPage: React.FC = () => {
       <SectionHeader
         title={`${c.id} · ${g?.title || c.goal}`}
         subtitle={`Origin: ${c.origin} · Recipient: ${c.recipientScope || 'Department'} · Turn: ${cbTurn(c) || 'Completed'}`}
-        actions={<StatusBadge label={c.status} />}
+        actions={
+          <div className="flex items-center gap-1.5">
+            <StatusBadge label={c.status} />
+            <HelpTip
+              title="Catchball: Aligned ≠ Approved"
+              body="Catchball är den tvåvägsdialog där ledning och avdelning förhandlar målnivå och resurser. När parterna trycker 'Agree & Align' blir status Aligned — det är en överenskommelse, inte ett formellt ISO-godkännande."
+              note="För att målet ska bli officiellt fastställt och synligt för Basic user måste det skickas till Approvals och godkännas av General director eller QMS auditor."
+              chapterId={5}
+              align="right"
+            />
+          </div>
+        }
       />
 
       <Card className="p-5 space-y-4">
@@ -408,9 +420,17 @@ export const ReviewsPage: React.FC = () => {
       <ScopeBar />
 
       {/* Exception Queue */}
-      <div className="space-y-3">
+      <div data-tour="pdca-queue" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-bold text-[var(--ink)]">Exception Queue ({scope})</h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-sm font-bold text-[var(--ink)]">Exception Queue ({scope})</h2>
+            <HelpTip
+              title="KPI-signal ≠ Formell PDCA Review"
+              body="Exception Queue samlar både automatiska avvikelsesignaler (röd KPI eller två gula månader i rad) och manuellt eskalerade blockers från Daily Board eller projekt."
+              note="En signal i kön är en larmklocka — för spårbar ISO-efterlevnad behöver den omvandlas till en dokumenterad PDCA Review med konkreta beslut, ägare och slutdatum."
+              chapterId={9}
+            />
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {(
               [
@@ -668,8 +688,17 @@ export const ApprovalsPage: React.FC = () => {
         subtitle="ISO 9001/14001/45001 governance gate for strategic goals, strategy plans, and archived approved snapshots."
       />
 
+      <div data-tour="approvals-list">
       <Card className="p-5 space-y-3">
-        <h2 className="text-sm font-bold text-[var(--ink)]">Pending Approval Queue ({pending.length})</h2>
+        <div className="flex items-center gap-1.5">
+          <h2 className="text-sm font-bold text-[var(--ink)]">Pending Approval Queue ({pending.length})</h2>
+          <HelpTip
+            title="Formellt godkännande & Revisionslås (v1 → v2)"
+            body="Endast General director eller QMS auditor kan trycka 'Approve'. Godkända mål blir officiella och synliga för rollen Basic user."
+            note="Om ett redan godkänt mål redigeras senare arkiveras den gamla versionen automatiskt som en snapshot i revisionsloggen, revisionsnumret räknas upp (t.ex. v1 → v2) och godkännandestatus återställs till Draft."
+            chapterId={5}
+          />
+        </div>
         {pending.length === 0 ? (
           <p className="text-xs text-[var(--muted)]">No pending goal approvals.</p>
         ) : (
@@ -720,6 +749,7 @@ export const ApprovalsPage: React.FC = () => {
           </div>
         )}
       </Card>
+      </div>
 
       {/* Strategy Plans */}
       <Card className="p-5 space-y-3">

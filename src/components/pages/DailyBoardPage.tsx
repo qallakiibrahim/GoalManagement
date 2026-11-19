@@ -536,7 +536,10 @@ export const DailyBoardPage: React.FC = () => {
         title="Daily Management Board (Tier 1–3)"
         subtitle="Real-time operational pulse: Safety Cross calendar, Live KPI status, Drag & Drop Kanban escalation/delegation, and synced Team Tasks."
         actions={
-          <div className="inline-flex rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] p-0.5">
+          <div
+            data-tour="daily-tiers"
+            className="inline-flex rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] p-0.5"
+          >
             {(
               [
                 { id: 'tier1', label: 'Tier 1 · Team Pulse' },

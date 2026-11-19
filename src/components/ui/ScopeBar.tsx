@@ -11,7 +11,10 @@ export const ScopeBar: React.FC<{
   const allowedScopes = isLimitedRole(activeRole) ? ['Organization', ASSIGNED_SITE, ASSIGNED_DEPARTMENT] : ALL_SCOPES;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card-shadow)] px-3.5 py-2.5 no-print">
+    <div
+      data-tour="scope-bar"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card-shadow)] px-3.5 py-2.5 no-print"
+    >
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">Scope</span>

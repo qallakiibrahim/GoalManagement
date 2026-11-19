@@ -58,7 +58,7 @@ export const MyFocusPage: React.FC = () => {
         title="Personal Obeya · My Focus"
         subtitle="Accountability cockpit linking X-Matrix KPIs, owned initiatives, daily pulse actions, and open PDCA exceptions."
         actions={
-          <div className="flex items-center gap-2">
+          <div data-tour="myfocus-header" className="flex items-center gap-2">
             <Compass className="w-4 h-4 text-teal-700 dark:text-teal-400" />
             <select
               value={currentOwner}

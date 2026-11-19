@@ -15,6 +15,11 @@ export const SAFEQMS_ROLES: SafeQmsRole[] = [
   'Basic user'
 ];
 
+export function formatRoleLabel(role: SafeQmsRole | string): string {
+  if (role === 'Administratör') return 'Administrator';
+  return role;
+}
+
 export const ALL_SCOPES = [
   'Organization',
   'Site: Uppsala',
@@ -39,6 +44,8 @@ export type RouteGroup =
 
 export type AppRoute =
   | 'overview'
+  | 'sop'
+  | 'onboarding'
   | 'daily'
   | 'myfocus'
   | 'pillars'

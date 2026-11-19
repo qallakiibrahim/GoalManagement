@@ -15,6 +15,7 @@ import {
 } from '../../domain/syncEngine';
 import { Card, SectionHeader, StatusBadge } from '../ui/Badge';
 import { ScopeBar } from '../ui/ScopeBar';
+import { HelpTip } from '../ui/HelpTip';
 
 type Selection =
   | { kind: 'none' }
@@ -33,8 +34,10 @@ export const XMatrixPage: React.FC = () => {
     domainSnapshot,
     navigate,
     cycleMatrixRelation,
+    setMatrixRelationStrength,
     editMatrixNote,
     cycleKpiOwner,
+    setKpiOwnerStrength,
     editKpiOwnerNote,
   } = useWorkspace();
 
@@ -81,6 +84,16 @@ export const XMatrixPage: React.FC = () => {
 
   const canEditCell = (from: string, to: string) => roleCan(activeRole, 'matrixEdit', { from, to }, { goals, initiatives });
   const canEditOwner = activeRole === 'Administratör' || activeRole === 'General director' || activeRole === 'QMS auditor' || activeRole === 'Department director';
+
+  const resolveEntityTitle = (id: string) => {
+    const g = goalById(goals, id);
+    if (g) return `${g.id} · ${g.title}`;
+    const i = initById(initiatives, id);
+    if (i) return `${i.id} · ${i.title}`;
+    const k = kpiById(domainSnapshot.kpis, id);
+    if (k) return `${k.id} · ${k.name}`;
+    return id;
+  };
 
   return (
     <div className="space-y-6">
@@ -132,7 +145,7 @@ export const XMatrixPage: React.FC = () => {
       />
 
       {/* Interactive 360° Board */}
-      <div className="xm3-scroller">
+      <div data-tour="xmatrix-board" className="xm3-scroller">
         <div className="xm3-board" style={boardStyle}>
           {/* NW: Annual Goals x Initiatives */}
           <div className="xm3-grid xm3-tl">
@@ -202,7 +215,16 @@ export const XMatrixPage: React.FC = () => {
 
           {/* Top-right Legend */}
           <div className="xm3-legendpanel text-[11px]">
-            <div className="font-bold text-[var(--ink)] mb-1">Matrix Legend</div>
+            <div className="flex items-center gap-1.5 font-bold text-[var(--ink)] mb-1">
+              <span>Matrix Legend</span>
+              <HelpTip
+                title="Så läser och redigerar du X-Matrix"
+                body="Klicka på valfri nod eller cell för att lysa upp hela kedjan av mål, initiativ, KPI:er och ägare. Behöriga roller kan dubbelklicka på en cell (eller ändra i sidopanelen) för att växla mellan ● Strong, ◐ Medium, ○ Weak och – Ingen relation."
+                note="Sydvästra kvadranten (SW, blå symboler) hämtas direkt från Goal Cascade-hierarkin, medan NW/NE visar taktisk påverkansstyrka."
+                chapterId={4}
+                align="right"
+              />
+            </div>
             <div className="flex items-center gap-2"><span className="xm3-dot strong" /> <span>Strong / Primary Owner (●)</span></div>
             <div className="flex items-center gap-2"><span className="xm3-dot medium" /> <span>Medium / Support (◐)</span></div>
             <div className="flex items-center gap-2"><span className="xm3-dot weak" /> <span>Weak link (○)</span></div>
@@ -349,7 +371,7 @@ export const XMatrixPage: React.FC = () => {
       <Card className="p-5 space-y-3">
         {selection.kind === 'none' && (
           <div className="text-xs text-[var(--muted)]">
-            <strong className="text-[var(--ink)]">Interactive Inspector:</strong> Click any Goal, Initiative, KPI, Pillar, Owner, or matrix intersection cell to trace full Hoshin causality. Double-click NW, NE, or SE intersections to cycle strength &amp; sync Firestore in real time.
+            <strong className="text-[var(--ink)]">Interactive Inspector:</strong> Click any Goal, Initiative, KPI, Pillar, Owner, or matrix intersection cell to trace causality and set connection strength in one click (or double-click any NW, NE, or SE cell to cycle).
           </div>
         )}
 
@@ -406,94 +428,146 @@ export const XMatrixPage: React.FC = () => {
           </div>
         )}
 
-        {selection.kind === 'cell' && (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-mono font-bold text-teal-700 dark:text-teal-400">
-                Intersection {selection.from} → {selection.to}
+        {selection.kind === 'cell' && (() => {
+          const isOwnerSector = selection.sector === 'br';
+          const isHierarchySector = selection.sector === 'bl';
+          const currentOwnerStrength = isOwnerSector ? xm3OwnerImpact(kpiOwners, selection.from, selection.to) : 0;
+          const currentRelStrength = !isOwnerSector && !isHierarchySector ? xm3Impact(relations, selection.from, selection.to) : 0;
+          const existingOwnerLink = isOwnerSector
+            ? kpiOwners.find((x) => x.kpi === selection.from && x.owner === selection.to)
+            : undefined;
+          const existingRelLink = !isOwnerSector && !isHierarchySector
+            ? relations.find((r) => r.from === selection.from && r.to === selection.to)
+            : undefined;
+
+          return (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="min-w-0 space-y-1">
+                <div className="text-xs font-semibold text-teal-700 dark:text-teal-400">
+                  <span className="font-mono">{resolveEntityTitle(selection.from)}</span>
+                  <span className="mx-1.5 text-[var(--muted)]">→</span>
+                  <span className="font-mono">{resolveEntityTitle(selection.to)}</span>
+                </div>
+                {isHierarchySector ? (
+                  <div className="text-xs text-[var(--ink)]">
+                    Hierarchical parent-child cascade link (
+                    {xm4HierarchyStrength(goals, selection.from, selection.to) === 2
+                      ? 'Direct parent'
+                      : xm4HierarchyStrength(goals, selection.from, selection.to) === 1
+                        ? 'Organization root ancestor'
+                        : 'No hierarchy link'}
+                    ). Manage parent in Goal detail.
+                  </div>
+                ) : isOwnerSector ? (
+                  <div className="text-xs text-[var(--ink)]">
+                    Accountability level:{' '}
+                    <strong>
+                      {currentOwnerStrength === 2
+                        ? 'Primary Owner'
+                        : currentOwnerStrength === 1
+                          ? 'Cross-Functional Support'
+                          : 'Unassigned'}
+                    </strong>
+                    {existingOwnerLink?.note && (
+                      <span className="text-[var(--muted)]"> — {existingOwnerLink.note}</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-xs text-[var(--ink)]">
+                    Relationship strength:{' '}
+                    <strong>
+                      {currentRelStrength === 2
+                        ? 'Strong'
+                        : currentRelStrength === 1
+                          ? 'Medium'
+                          : currentRelStrength === 0.5
+                            ? 'Weak'
+                            : 'None'}
+                    </strong>
+                    {existingRelLink?.note && (
+                      <span className="text-[var(--muted)]"> — {existingRelLink.note}</span>
+                    )}
+                  </div>
+                )}
               </div>
-              {selection.sector === 'bl' ? (
-                <div className="text-xs text-[var(--ink)] mt-1">
-                  Hierarchical parent-child cascade link ({xm4HierarchyStrength(goals, selection.from, selection.to) === 2 ? 'Direct parent' : xm4HierarchyStrength(goals, selection.from, selection.to) === 1 ? 'Organization root ancestor' : 'No hierarchy link'}). Manage parent in Goal detail.
-                </div>
-              ) : selection.sector === 'br' ? (
-                <div className="text-xs text-[var(--ink)] mt-1">
-                  Accountability level:{' '}
-                  <strong>
-                    {xm3OwnerImpact(kpiOwners, selection.from, selection.to) === 2
-                      ? 'Primary Owner'
-                      : xm3OwnerImpact(kpiOwners, selection.from, selection.to) === 1
-                        ? 'Cross-Functional Support'
-                        : 'Unassigned'}
-                  </strong>
-                  {kpiOwners.find((x) => x.kpi === selection.from && x.owner === selection.to)?.note && (
-                    <span> — {kpiOwners.find((x) => x.kpi === selection.from && x.owner === selection.to)?.note}</span>
-                  )}
-                </div>
-              ) : (
-                <div className="text-xs text-[var(--ink)] mt-1">
-                  Relationship strength:{' '}
-                  <strong>
-                    {xm3Impact(relations, selection.from, selection.to) === 2
-                      ? 'Strong'
-                      : xm3Impact(relations, selection.from, selection.to) === 1
-                        ? 'Medium'
-                        : xm3Impact(relations, selection.from, selection.to) === 0.5
-                          ? 'Weak'
-                          : 'None'}
-                  </strong>
-                  {relations.find((r) => r.from === selection.from && r.to === selection.to)?.note && (
-                    <span> — {relations.find((r) => r.from === selection.from && r.to === selection.to)?.note}</span>
+
+              {!isHierarchySector && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {isOwnerSector ? (
+                    canEditOwner && (
+                      <>
+                        <div className="inline-flex rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] p-0.5">
+                          {(
+                            [
+                              { value: 0, label: 'Unassigned' },
+                              { value: 1, label: 'Support ◐' },
+                              { value: 2, label: 'Primary ●' },
+                            ] as const
+                          ).map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setKpiOwnerStrength(selection.from, selection.to, opt.value)}
+                              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                                currentOwnerStrength === opt.value
+                                  ? 'bg-teal-700 text-white dark:bg-teal-600'
+                                  : 'text-[var(--muted)] hover:text-[var(--ink)]'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => editKpiOwnerNote(selection.from, selection.to)}
+                          className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--surface-subtle)] cursor-pointer"
+                        >
+                          {existingOwnerLink?.note ? 'Edit Note' : 'Add Note'}
+                        </button>
+                      </>
+                    )
+                  ) : (
+                    canEditCell(selection.from, selection.to) && (
+                      <>
+                        <div className="inline-flex rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] p-0.5">
+                          {(
+                            [
+                              { value: 0, label: 'None' },
+                              { value: 0.5, label: 'Weak ○' },
+                              { value: 1, label: 'Medium ◐' },
+                              { value: 2, label: 'Strong ●' },
+                            ] as const
+                          ).map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setMatrixRelationStrength(selection.from, selection.to, opt.value)}
+                              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                                currentRelStrength === opt.value
+                                  ? 'bg-teal-700 text-white dark:bg-teal-600'
+                                  : 'text-[var(--muted)] hover:text-[var(--ink)]'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => editMatrixNote(selection.from, selection.to)}
+                          className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--surface-subtle)] cursor-pointer"
+                        >
+                          {existingRelLink?.note ? 'Edit Rationale' : 'Add Rationale'}
+                        </button>
+                      </>
+                    )
                   )}
                 </div>
               )}
             </div>
-
-            {selection.sector !== 'bl' && (
-              <div className="flex gap-2">
-                {selection.sector === 'br' ? (
-                  canEditOwner && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => cycleKpiOwner(selection.from, selection.to)}
-                        className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
-                      >
-                        Cycle Owner Role
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => editKpiOwnerNote(selection.from, selection.to)}
-                        className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--surface-subtle)] cursor-pointer"
-                      >
-                        Edit Note
-                      </button>
-                    </>
-                  )
-                ) : (
-                  canEditCell(selection.from, selection.to) && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => cycleMatrixRelation(selection.from, selection.to)}
-                        className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
-                      >
-                        Cycle Strength
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => editMatrixNote(selection.from, selection.to)}
-                        className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--surface-subtle)] cursor-pointer"
-                      >
-                        Edit Rationale
-                      </button>
-                    </>
-                  )
-                )}
-              </div>
-            )}
-          </div>
-        )}
+          );
+        })()}
       </Card>
 
       {/* Optional Relationship Tables */}

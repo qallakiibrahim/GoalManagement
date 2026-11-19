@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   Award,
   BarChart3,
+  BookOpen,
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
@@ -23,6 +24,8 @@ import {
   PanelLeftOpen,
   Plus,
   RefreshCw,
+  Rocket,
+  Search,
   ShieldCheck,
   Sun,
   Target,
@@ -30,9 +33,18 @@ import {
   UserCog,
   X,
 } from 'lucide-react';
-import { AppRoute, SAFEQMS_ROLES, SafeQmsRole } from '../../types/safeqms';
+import { AppRoute, SAFEQMS_ROLES, SafeQmsRole, formatRoleLabel } from '../../types/safeqms';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { isLimitedRole, leadershipRole, roleCan } from '../../domain/syncEngine';
+import { useWalkthrough } from '../../context/WalkthroughContext';
+import {
+  cbCanRead,
+  isLimitedRole,
+  leadershipRole,
+  roleCan,
+  visibleInitiative,
+  visibleProject,
+  visibleToRole,
+} from '../../domain/syncEngine';
 import { FirestoreErrorBanner, SkeletonView } from '../ui/SkeletonView';
 import { ModalHost } from '../ui/ModalHost';
 import { ToastHost } from '../ui/ToastHost';
@@ -51,6 +63,8 @@ interface NavSection {
 
 const ROUTE_TITLES: Record<AppRoute, string> = {
   overview: 'Overview',
+  sop: 'SOP & User Guide',
+  onboarding: 'Ny kund · Starta från noll',
   daily: 'Daily Management Board',
   myfocus: 'Personal Obeya',
   pillars: 'Strategic Pillars',
@@ -98,10 +112,14 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     isActualAdmin,
     setPreviewRole,
     goals,
+    kpis,
     initiatives,
+    projects,
+    catchballs,
     activities,
     markActivityRead,
   } = useWorkspace();
+  const { onboardingBanner, setOnboardingBanner } = useWalkthrough();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
@@ -111,12 +129,33 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       return false;
     }
   });
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('safeqms_sidebar_open_sections');
+      if (!saved) return {};
+      const parsed = JSON.parse(saved);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  });
+  const [quickSearchOpen, setQuickSearchOpen] = useState(false);
+  const [quickSearchQuery, setQuickSearchQuery] = useState('');
+  const [quickSearchIdx, setQuickSearchIdx] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
+  const quickSearchInputRef = useRef<HTMLInputElement | null>(null);
 
   const toggleSection = (title: string) => {
-    setOpenSections((prev) => ({ ...prev, [title]: !prev[title] }));
+    setOpenSections((prev) => {
+      const next = { ...prev, [title]: !prev[title] };
+      try {
+        localStorage.setItem('safeqms_sidebar_open_sections', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
   };
 
   const toggleSidebarCollapsed = () => {
@@ -130,6 +169,29 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       return next;
     });
   };
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setQuickSearchOpen((prev) => {
+          const next = !prev;
+          if (next) {
+            setQuickSearchQuery('');
+            setQuickSearchIdx(0);
+          }
+          return next;
+        });
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (!quickSearchOpen) return;
+    setTimeout(() => quickSearchInputRef.current?.focus(), 0);
+  }, [quickSearchOpen]);
 
   useEffect(() => {
     if (!userMenuOpen) return;
@@ -148,6 +210,177 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [userMenuOpen]);
+
+  const isBasic = activeRole === 'Basic user';
+  const canCreateGoal = roleCan(activeRole, 'goalCreate', null, { goals, initiatives });
+  const canWriteKpi = roleCan(activeRole, 'kpiWrite', { id: 'K-002' }, { goals, initiatives });
+
+  const sections: NavSection[] = [
+    {
+      title: 'Workspace',
+      items: [
+        { route: 'overview', label: 'Overview', icon: LayoutDashboard },
+        { route: 'sop', label: 'SOP & User Guide', icon: BookOpen },
+        { route: 'onboarding', label: 'Starta från noll', icon: Rocket },
+      ],
+    },
+    {
+      title: 'Daily Operations',
+      items: [
+        { route: 'daily', label: 'Daily Board', icon: Kanban },
+        { route: 'myfocus', label: 'My Focus (Obeya)', icon: Compass },
+      ],
+    },
+    {
+      title: 'Strategy Deployment',
+      items: [
+        { route: 'pillars', label: 'Strategic Pillars', icon: Layers },
+        { route: 'cascade', label: 'Goal Cascade', icon: GitBranch },
+        { route: 'matrix', label: 'X-Matrix', icon: Grid3X3 },
+        { route: 'a3', label: 'Strategy A3', icon: Target },
+      ],
+    },
+    {
+      title: 'Execution & KPIs',
+      items: [
+        { route: 'projects', label: 'Initiatives & A3', icon: FolderKanban },
+        { route: 'kpis', label: 'KPIs & Bowling Chart', icon: BarChart3 },
+        { route: 'import', label: 'CSV KPI Import', icon: Upload, hidden: !canWriteKpi && isLimitedRole(activeRole) },
+      ],
+    },
+    {
+      title: 'Governance',
+      items: [
+        { route: 'catchball', label: 'Catchball Alignment', icon: MessageSquareMore, hidden: isBasic },
+        { route: 'reviews', label: 'PDCA Reviews', icon: RefreshCw },
+        { route: 'approvals', label: 'Formal Approvals', icon: CheckCircle2, hidden: isBasic },
+      ],
+    },
+    {
+      title: 'ISO Assurance',
+      items: [
+        { route: 'iso', label: 'ISO Compliance', icon: Award, hidden: isBasic },
+        { route: 'evidence', label: 'Audit Evidence Pack', icon: ClipboardCheck, hidden: isBasic },
+        { route: 'management', label: 'Management Review', icon: FileSpreadsheet, hidden: isBasic },
+      ],
+    },
+  ];
+
+  const quickSearchItems = useMemo(() => {
+    const list: Array<{
+      key: string;
+      category: string;
+      code?: string;
+      label: string;
+      meta: string;
+      route: AppRoute;
+      id?: string;
+    }> = [];
+
+    for (const sec of sections) {
+      for (const item of sec.items) {
+        if (!item.hidden) {
+          list.push({
+            key: `nav-${item.route}`,
+            category: 'View',
+            label: item.label,
+            meta: sec.title,
+            route: item.route,
+          });
+        }
+      }
+    }
+    if (isActualAdmin) {
+      list.push({
+        key: 'nav-settings',
+        category: 'View',
+        label: 'Team & Workspace Settings',
+        meta: 'Administration',
+        route: 'settings',
+      });
+    }
+
+    for (const g of goals) {
+      if (visibleToRole(g, activeRole)) {
+        list.push({
+          key: `goal-${g.id}`,
+          category: 'Goal',
+          code: g.id,
+          label: g.title,
+          meta: `${g.level} · ${g.owner}`,
+          route: 'goal',
+          id: g.id,
+        });
+      }
+    }
+
+    for (const k of kpis) {
+      list.push({
+        key: `kpi-${k.id}`,
+        category: 'KPI',
+        code: k.id,
+        label: k.name,
+        meta: `Unit: ${k.unit}`,
+        route: 'kpis',
+        id: k.id,
+      });
+    }
+
+    for (const i of initiatives) {
+      if (visibleInitiative(i, goals, activeRole)) {
+        list.push({
+          key: `init-${i.id}`,
+          category: 'Initiative',
+          code: i.id,
+          label: i.title,
+          meta: `${i.owner} · ${i.progress}%`,
+          route: 'initiative',
+          id: i.id,
+        });
+      }
+    }
+
+    for (const p of projects) {
+      if (visibleProject(p, initiatives, goals, activeRole)) {
+        list.push({
+          key: `proj-${p.id}`,
+          category: 'Project A3',
+          code: p.id,
+          label: p.title,
+          meta: `${p.initiative} · ${p.owner}`,
+          route: 'project',
+          id: p.id,
+        });
+      }
+    }
+
+    for (const c of catchballs) {
+      if (cbCanRead(c, goals, activeRole)) {
+        list.push({
+          key: `cb-${c.id}`,
+          category: 'Catchball',
+          code: c.id,
+          label: `Goal ${c.goal} · Target ${c.proposal.target}`,
+          meta: c.status,
+          route: 'catchballitem',
+          id: c.id,
+        });
+      }
+    }
+
+    return list;
+  }, [activeRole, isActualAdmin, canWriteKpi, isBasic, goals, kpis, initiatives, projects, catchballs]);
+
+  const filteredQuickResults = useMemo(() => {
+    const q = quickSearchQuery.trim().toLowerCase();
+    if (!q) return quickSearchItems.slice(0, 12);
+    return quickSearchItems
+      .filter((item) => {
+        const hay = `${item.code || ''} ${item.label} ${item.meta} ${item.category}`.toLowerCase();
+        return hay.includes(q);
+      })
+      .slice(0, 14);
+  }, [quickSearchItems, quickSearchQuery]);
 
   if (!authReady) {
     return (
@@ -204,57 +437,6 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       </div>
     );
   }
-
-  const isBasic = activeRole === 'Basic user';
-  const canCreateGoal = roleCan(activeRole, 'goalCreate', null, { goals, initiatives });
-  const canWriteKpi = roleCan(activeRole, 'kpiWrite', { id: 'K-002' }, { goals, initiatives });
-
-  const sections: NavSection[] = [
-    {
-      title: 'Workspace',
-      items: [{ route: 'overview', label: 'Overview', icon: LayoutDashboard }],
-    },
-    {
-      title: 'Daily Operations',
-      items: [
-        { route: 'daily', label: 'Daily Board', icon: Kanban },
-        { route: 'myfocus', label: 'My Focus (Obeya)', icon: Compass },
-      ],
-    },
-    {
-      title: 'Strategy Deployment',
-      items: [
-        { route: 'pillars', label: 'Strategic Pillars', icon: Layers },
-        { route: 'cascade', label: 'Goal Cascade', icon: GitBranch },
-        { route: 'matrix', label: 'X-Matrix', icon: Grid3X3 },
-        { route: 'a3', label: 'Strategy A3', icon: Target },
-      ],
-    },
-    {
-      title: 'Execution & KPIs',
-      items: [
-        { route: 'projects', label: 'Initiatives & A3', icon: FolderKanban },
-        { route: 'kpis', label: 'KPIs & Bowling Chart', icon: BarChart3 },
-        { route: 'import', label: 'CSV KPI Import', icon: Upload, hidden: !canWriteKpi && isLimitedRole(activeRole) },
-      ],
-    },
-    {
-      title: 'Governance',
-      items: [
-        { route: 'catchball', label: 'Catchball Alignment', icon: MessageSquareMore, hidden: isBasic },
-        { route: 'reviews', label: 'PDCA Reviews', icon: RefreshCw },
-        { route: 'approvals', label: 'Formal Approvals', icon: CheckCircle2, hidden: isBasic },
-      ],
-    },
-    {
-      title: 'ISO Assurance',
-      items: [
-        { route: 'iso', label: 'ISO Compliance', icon: Award, hidden: isBasic },
-        { route: 'evidence', label: 'Audit Evidence Pack', icon: ClipboardCheck, hidden: isBasic },
-        { route: 'management', label: 'Management Review', icon: FileSpreadsheet, hidden: isBasic },
-      ],
-    },
-  ];
 
   // Unread Catchball notifications for current role
   const cbUnread = activities.filter(
@@ -418,8 +600,24 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           </span>
         </div>
 
-        {/* Right: Primary Action, Theme & Account */}
+        {/* Right: Quick Search, Primary Action, Theme & Account */}
         <div className="flex items-center gap-2 whitespace-nowrap shrink-0">
+          <button
+            type="button"
+            data-tour="global-search"
+            onClick={() => {
+              setQuickSearchQuery('');
+              setQuickSearchIdx(0);
+              setQuickSearchOpen(true);
+            }}
+            className="h-8 inline-flex items-center gap-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 text-xs text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] transition-colors cursor-pointer"
+            aria-label="Quick search"
+            title="Quick search (Ctrl+K / ⌘K)"
+          >
+            <Search className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden md:inline">Search...</span>
+            <kbd className="hidden lg:inline font-mono text-[10px] text-[var(--muted)]">⌘K</kbd>
+          </button>
           {canCreateGoal && (
             <button
               type="button"
@@ -459,7 +657,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 <div className="font-semibold text-xs text-[var(--ink)] max-w-[130px] truncate">
                   {user.displayName || user.email}
                 </div>
-                <div className="text-[10px] text-[var(--muted)]">{activeRole}</div>
+                <div className="text-[10px] text-[var(--muted)]">{formatRoleLabel(activeRole)}</div>
               </div>
               <ChevronDown
                 className={`w-3.5 h-3.5 text-[var(--muted)] transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
@@ -479,7 +677,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                     <div className="text-[11px] text-[var(--muted)] truncate">{user.email}</div>
                   )}
                   <div className="pt-1 flex items-center justify-between text-[10px] font-semibold text-teal-700 dark:text-teal-300">
-                    <span>{actualRole}</span>
+                    <span>{formatRoleLabel(actualRole)}</span>
                     {activeWorkspace && (
                       <span className="text-[var(--muted)] font-normal truncate max-w-[120px]">
                         {activeWorkspace.name}
@@ -507,7 +705,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                       <div className="min-w-0">
                         <div>Administration</div>
                         <div className="text-[10px] font-normal text-[var(--muted)]">
-                          Team, användarroller &amp; arbetsyta
+                          Team, roles &amp; workspace
                         </div>
                       </div>
                     </button>
@@ -523,7 +721,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                       >
                         {SAFEQMS_ROLES.map((r) => (
                           <option key={r} value={r}>
-                            {r}
+                            {formatRoleLabel(r)}
                           </option>
                         ))}
                       </select>
@@ -571,7 +769,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               >
                 {SAFEQMS_ROLES.map((r) => (
                   <option key={r} value={r}>
-                    {r}
+                    {formatRoleLabel(r)}
                   </option>
                 ))}
               </select>
@@ -589,7 +787,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 <button
                   type="button"
                   onClick={() => setMobileOpen(false)}
-                  className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--ink)]"
+                  className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--ink)] cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -603,18 +801,52 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         <main className="flex-1 min-w-0 flex flex-col">
           <FirestoreErrorBanner />
 
+          {/* Cross-Module Onboarding Follow-Along Banner */}
+          {onboardingBanner && route !== 'onboarding' && (
+            <div className="mx-4 sm:mx-6 mt-4 rounded-xl border border-teal-600/30 bg-teal-600/10 px-4 py-2.5 text-xs text-teal-950 dark:border-teal-400/30 dark:bg-teal-400/10 dark:text-teal-100 flex flex-wrap items-center justify-between gap-3 no-print">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Rocket className="w-4 h-4 shrink-0 text-teal-700 dark:text-teal-300" />
+                <div className="min-w-0">
+                  <span className="font-bold">
+                    Guidad uppstart · Steg {onboardingBanner.step}/{onboardingBanner.total}: {onboardingBanner.title}
+                  </span>
+                  <span className="ml-2 text-[var(--ink)]/80 dark:text-teal-100/85">
+                    {onboardingBanner.instruction}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => navigate('onboarding', `step-${onboardingBanner.step}`)}
+                  className="rounded-lg bg-teal-700 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
+                >
+                  ← Tillbaka till Steg {onboardingBanner.step}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOnboardingBanner(null)}
+                  aria-label="Stäng uppstartsbanner"
+                  className="rounded-md p-1 text-teal-900/70 hover:bg-teal-600/15 hover:text-teal-950 dark:text-teal-200/70 dark:hover:text-teal-100 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Role Preview Strip */}
           {isActualAdmin && activeRole !== actualRole && (
             <div className="mx-4 sm:mx-6 mt-4 rounded-xl border border-amber-600/25 bg-amber-500/10 px-4 py-2 text-xs text-amber-900 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200 flex items-center justify-between gap-2 no-print">
               <span>
-                Previewing UI perspective as <strong>{activeRole}</strong> (Actual role: {actualRole}).
+                Previewing UI perspective as <strong>{formatRoleLabel(activeRole)}</strong> (Actual role: {formatRoleLabel(actualRole)}).
               </span>
               <button
                 type="button"
                 onClick={() => setPreviewRole(actualRole)}
                 className="font-semibold underline hover:no-underline cursor-pointer"
               >
-                Reset to {actualRole}
+                Reset to {formatRoleLabel(actualRole)}
               </button>
             </div>
           )}
@@ -712,6 +944,115 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           </div>
         </main>
       </div>
+
+      {quickSearchOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/60 pt-[12vh] p-4 backdrop-blur-[2px] no-print"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setQuickSearchOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-label="Quick search"
+            className="w-full max-w-xl rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] shadow-2xl overflow-hidden"
+          >
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[var(--border)]">
+              <Search className="w-4 h-4 text-[var(--muted)] shrink-0" />
+              <input
+                ref={quickSearchInputRef}
+                type="text"
+                value={quickSearchQuery}
+                onChange={(e) => {
+                  setQuickSearchQuery(e.target.value);
+                  setQuickSearchIdx(0);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setQuickSearchOpen(false);
+                  } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setQuickSearchIdx((prev) =>
+                      filteredQuickResults.length ? (prev + 1) % filteredQuickResults.length : 0
+                    );
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setQuickSearchIdx((prev) =>
+                      filteredQuickResults.length
+                        ? (prev - 1 + filteredQuickResults.length) % filteredQuickResults.length
+                        : 0
+                    );
+                  } else if (e.key === 'Enter') {
+                    const hit = filteredQuickResults[quickSearchIdx];
+                    if (hit) {
+                      e.preventDefault();
+                      navigate(hit.route, hit.id);
+                      setQuickSearchOpen(false);
+                    }
+                  }
+                }}
+                placeholder="Jump to a view, goal (G-001), KPI (K-002), initiative, or A3..."
+                className="flex-1 bg-transparent text-sm text-[var(--ink)] placeholder:text-[var(--muted)] focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setQuickSearchOpen(false)}
+                className="rounded-md p-1 text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] cursor-pointer"
+                aria-label="Close quick search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto py-1.5">
+              {filteredQuickResults.length === 0 ? (
+                <div className="px-4 py-6 text-center text-xs text-[var(--muted)]">
+                  No matching views or workspace items found.
+                </div>
+              ) : (
+                filteredQuickResults.map((item, idx) => {
+                  const selected = idx === quickSearchIdx;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onMouseEnter={() => setQuickSearchIdx(idx)}
+                      onClick={() => {
+                        navigate(item.route, item.id);
+                        setQuickSearchOpen(false);
+                      }}
+                      className={`w-full px-4 py-2.5 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer ${
+                        selected
+                          ? 'bg-teal-600/10 text-teal-800 dark:bg-teal-400/12 dark:text-teal-200'
+                          : 'text-[var(--ink)] hover:bg-[var(--surface-subtle)]'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold truncate">
+                          {item.code && (
+                            <span className="font-mono text-[var(--muted)] mr-1.5">{item.code}</span>
+                          )}
+                          {item.label}
+                        </div>
+                        <div className="text-[11px] text-[var(--muted)] truncate">{item.meta}</div>
+                      </div>
+                      <span className="text-[11px] font-medium text-[var(--muted)] shrink-0">
+                        {item.category}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="px-4 py-2 border-t border-[var(--border)] bg-[var(--surface-subtle)]/50 flex items-center justify-between text-[11px] text-[var(--muted)]">
+              <span>↑↓ Navigate · Enter Open</span>
+              <span>Esc Close</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ModalHost />
       <ToastHost />

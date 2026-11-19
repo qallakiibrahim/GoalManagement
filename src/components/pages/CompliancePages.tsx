@@ -13,6 +13,7 @@ import {
 } from '../../domain/syncEngine';
 import { Card, SectionHeader, StatusBadge } from '../ui/Badge';
 import { ScopeBar } from '../ui/ScopeBar';
+import { HelpTip } from '../ui/HelpTip';
 
 export const IsoPage: React.FC = () => {
   const {
@@ -92,6 +93,7 @@ export const IsoPage: React.FC = () => {
         </Card>
       )}
 
+      <div data-tour="iso-table">
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -99,7 +101,16 @@ export const IsoPage: React.FC = () => {
               <tr>
                 <th className="px-4 py-2.5 font-semibold">Goal</th>
                 <th className="px-4 py-2.5 font-semibold">ISO Clauses</th>
-                <th className="px-4 py-2.5 font-semibold">Clause 6.2 Planning</th>
+                <th className="px-4 py-2.5 font-semibold">
+                  <span className="inline-flex items-center gap-1">
+                    <span>Clause 6.2 Planning</span>
+                    <HelpTip
+                      title="Planeringskomplett ≠ Verifierad ISO-efterlevnad"
+                      body="Kolumnen 'Clause 6.2 Planning' verifierar att målets obligatoriska planeringsfält är ifyllda. För komplett ISO-revision krävs dessutom faktiska KPI-mätvärden, godkännandehistorik och dokumenterade PDCA-beslut."
+                      chapterId={10}
+                    />
+                  </span>
+                </th>
                 <th className="px-4 py-2.5 font-semibold">Risk / Process / Doc Refs</th>
                 <th className="px-4 py-2.5 font-semibold">KPI Actuals</th>
               </tr>
@@ -135,6 +146,7 @@ export const IsoPage: React.FC = () => {
           </table>
         </div>
       </Card>
+      </div>
     </div>
   );
 };
@@ -168,7 +180,7 @@ export const EvidencePage: React.FC = () => {
         title="Audit Evidence Pack"
         subtitle="Audit-ready ISO 9001/14001/45001 traceability bundle combining objectives, planning fields, monthly measurements, approvals, and review decisions."
         actions={
-          <div className="flex flex-wrap gap-2 no-print">
+          <div data-tour="evidence-actions" className="flex flex-wrap gap-2 no-print">
             <select
               value={effectiveFilter}
               onChange={(e) => setGoalFilter(e.target.value)}

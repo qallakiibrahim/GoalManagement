@@ -54,6 +54,7 @@ import {
   WorkspaceActivity,
   WorkspaceDoc,
   WorkspaceMember,
+  formatRoleLabel,
 } from '../types/safeqms';
 import {
   DomainSnapshot,
@@ -81,7 +82,7 @@ import { ISO_EXAMPLE_CATALOG, createSeedDataset } from '../domain/seedData';
 
 export interface ModalConfig {
   isOpen: boolean;
-  type: 'alert' | 'confirm' | 'prompt' | 'counter' | 'escalate' | 'pdcaDecision';
+  type: 'alert' | 'confirm' | 'prompt' | 'counter' | 'escalate' | 'pdcaDecision' | 'kpiMonth';
   title: string;
   message: string;
   items?: string[];
@@ -98,6 +99,14 @@ export interface ModalConfig {
   defaultReviewId?: string;
   defaultOwner?: string;
   defaultDue?: string;
+  kpiMonth?: {
+    kpiId: string;
+    monthIndex: number;
+    monthLabel: string;
+    unit: string;
+    actual: number | null;
+    target: number | null;
+  };
   resolve?: (value: any) => void;
 }
 
@@ -109,6 +118,8 @@ export interface ToastMessage {
 
 const ROUTE_GROUP_MAP: Record<AppRoute, RouteGroup> = {
   overview: 'overview',
+  sop: 'overview',
+  onboarding: 'overview',
   daily: 'daily',
   myfocus: 'daily',
   pillars: 'strategy',
@@ -186,6 +197,7 @@ interface WorkspaceContextValue {
   activeWorkspace: WorkspaceDoc | null;
   switchWorkspace: (workspaceId: string) => Promise<void>;
   createWorkspace: (name: string) => Promise<void>;
+  createBlankWorkspace: (name: string) => Promise<string | null>;
   seedOrResetWorkspace: () => Promise<void>;
   retryWorkspaceSetup: () => Promise<void>;
 
@@ -249,13 +261,38 @@ interface WorkspaceContextValue {
   decideApproval: (approvalId: string, status: 'Approved' | 'Changes requested') => Promise<void>;
   revisePlan: (planId: string) => Promise<void>;
   recordKpiActual: (kpiId: string) => Promise<void>;
+  updateKpiMonth: (kpiId: string, monthIndex: number, actual: number | null, target: number | null) => Promise<void>;
+  createKpi: (input: {
+    name: string;
+    unit: string;
+    direction: 'higher' | 'lower' | 'range';
+    tolerance: number;
+    monthlyTarget: number;
+    initialActual?: number | null;
+    source?: string;
+  }) => Promise<string | null>;
   commitCsvImport: (records: ParsedCsvRecord[]) => Promise<boolean>;
   cycleMatrixRelation: (from: string, to: string) => Promise<void>;
+  setMatrixRelationStrength: (from: string, to: string, strength: 0 | 0.5 | 1 | 2, note?: string) => Promise<void>;
   editMatrixNote: (from: string, to: string) => Promise<void>;
   cycleKpiOwner: (kpiId: string, ownerName: string) => Promise<void>;
+  setKpiOwnerStrength: (kpiId: string, ownerName: string, strength: 0 | 1 | 2, note?: string) => Promise<void>;
   editKpiOwnerNote: (kpiId: string, ownerName: string) => Promise<void>;
   createInitiative: (data: Omit<Initiative, 'id' | 'workspaceId' | 'ownerUid' | 'memberUids' | 'createdAt' | 'updatedAt'>) => Promise<string | null>;
   updateInitiativeFocus: (id: string, patch: Pick<Initiative, 'progress' | 'status' | 'valueStream' | 'isBottleneck' | 'sqdc'>) => Promise<void>;
+  createProjectA3: (input: {
+    title: string;
+    initiative: string;
+    owner: string;
+    escalationTier?: EscalationTier;
+    problem?: string;
+    current?: string;
+    target?: string;
+    root?: string;
+    fiveWhys?: FiveWhyStep[];
+    counter?: string;
+    learning?: string;
+  }) => Promise<string | null>;
   saveProjectA3: (
     id: string,
     patch: {
@@ -952,6 +989,95 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     [user, userProfile?.displayName, seedWorkspaceIntoFirestore, toast, navigate]
   );
 
+  const createBlankWorkspace = useCallback(
+    async (name: string): Promise<string | null> => {
+      if (!user) return null;
+      const cleanName = name.trim().slice(0, 140);
+      if (!cleanName) {
+        toast('Ange ett namn för kundarbetsytan', 'error');
+        return null;
+      }
+      const wsId = toValidDocId(`ws_clean_${Date.now().toString(36)}_${user.uid.slice(0, 6)}`);
+      const ownerDisplayName = (userProfile?.displayName || user.displayName || 'Administrator').trim().slice(0, 120) || 'Administrator';
+      const todayStr = new Date().toISOString().slice(0, 10);
+      setLoadingWorkspace(true);
+      try {
+        // Step 1: Create parent workspace doc with ISO standard catalog (0 demo items)
+        await setDoc(doc(db, 'workspaces', wsId), {
+          id: wsId,
+          name: cleanName,
+          ownerUid: user.uid,
+          memberUids: [user.uid],
+          scope: 'Organization',
+          year: '2027',
+          isoCatalogSource: 'SafeQMS Standard ISO 9001 / 14001 / 45001',
+          isoStandards: ISO_EXAMPLE_CATALOG,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        // Step 2: Create owner admin membership doc
+        await setDoc(doc(db, 'workspaces', wsId, 'members', user.uid), {
+          uid: user.uid,
+          workspaceId: wsId,
+          ownerUid: user.uid,
+          memberUids: [user.uid],
+          displayName: ownerDisplayName,
+          safeqmsRole: 'Administratör',
+          assignedSite: ASSIGNED_SITE,
+          assignedDepartment: ASSIGNED_DEPARTMENT,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        // Step 3: Create initial blank Strategy Plan & welcome audit log entry
+        const batch = writeBatch(db);
+        batch.set(doc(db, 'workspaces', wsId, 'plans', 'PL-001'), {
+          id: 'PL-001',
+          workspaceId: wsId,
+          ownerUid: user.uid,
+          memberUids: [user.uid],
+          scope: 'Organization',
+          period: '2027–2029',
+          name: `${cleanName} · Strategic Plan`.slice(0, 240),
+          status: 'Draft',
+          revision: 1,
+          owner: ownerDisplayName,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        batch.set(doc(db, 'workspaces', wsId, 'activities', 'ACT-001'), {
+          id: 'ACT-001',
+          workspaceId: wsId,
+          ownerUid: user.uid,
+          memberUids: [user.uid],
+          kind: 'history',
+          payload: { time: todayStr, text: `Ny tom kundarbetsyta "${cleanName}" skapad från noll` },
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        await batch.commit();
+
+        await updateDoc(doc(db, 'users', user.uid), {
+          defaultWorkspaceId: wsId,
+          updatedAt: serverTimestamp(),
+        });
+        setActiveWorkspaceId(wsId);
+        setLocalScope('Organization');
+        setLocalYear('2027');
+        setPreviewRoleState(null);
+        toast(`Tom kundarbetsyta "${cleanName}" skapad`, 'success');
+        navigate('onboarding');
+        return wsId;
+      } catch (err) {
+        return failMutation(err, OperationType.WRITE, `workspaces/${wsId}`, 'Kunde inte skapa ny kundarbetsyta');
+      } finally {
+        setLoadingWorkspace(false);
+      }
+    },
+    [user, userProfile?.displayName, toast, navigate, failMutation]
+  );
+
   const seedOrResetWorkspace = useCallback(async () => {
     if (!user || !activeWorkspace) return;
     const ok = await showModal({
@@ -1645,7 +1771,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const batch = writeBatch(db);
       batch.update(doc(db, 'workspaces', activeWorkspaceId, 'kpis', k.id), {
         values: nextValues,
-        source: `Manual entry (${activeRole})`,
+        source: `Manual entry (${formatRoleLabel(activeRole)})`,
         sourceUpdated: today,
         updatedAt: serverTimestamp(),
       });
@@ -1663,6 +1789,58 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     },
     [activeWorkspaceId, kpis, activeRole, goals, initiatives, showModal, today, toast]
+  );
+
+  const updateKpiMonth = useCallback(
+    async (kpiId: string, monthIndex: number, actual: number | null, target: number | null) => {
+      if (!activeWorkspaceId) return;
+      if (monthIndex < 0 || monthIndex > 11) return;
+      const k = kpiById(kpis, kpiId);
+      if (!k) return;
+      if (!roleCan(activeRole, 'kpiWrite', k, { goals, initiatives })) {
+        toast('Your role cannot update this KPI', 'error');
+        return;
+      }
+
+      const nextValues = [...k.values].slice(0, 12);
+      const nextTargets = [...k.targets].slice(0, 12);
+      while (nextValues.length <= monthIndex) nextValues.push(null);
+      while (nextTargets.length <= monthIndex) nextTargets.push(null);
+      nextValues[monthIndex] = actual;
+      nextTargets[monthIndex] = target;
+
+      // Trim trailing nulls to match compact month-array style if cleared at the end
+      while (nextValues.length > 0 && (nextValues[nextValues.length - 1] === null || nextValues[nextValues.length - 1] === undefined)) {
+        nextValues.pop();
+      }
+
+      const nextKpi: KpiMetric = { ...k, values: nextValues, targets: nextTargets };
+      const nextPerf = computeKpiStatus(nextKpi).label;
+
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'workspaces', activeWorkspaceId, 'kpis', k.id), {
+        values: nextValues,
+        targets: nextTargets,
+        source: `Manual entry (${formatRoleLabel(activeRole)})`,
+        sourceUpdated: today,
+        updatedAt: serverTimestamp(),
+      });
+      for (const g of goals.filter((x) => x.kpi === k.id && x.performance !== nextPerf)) {
+        batch.update(doc(db, 'workspaces', activeWorkspaceId, 'goals', g.id), {
+          performance: nextPerf,
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      try {
+        await batch.commit();
+        toast(`${k.id} (${months[monthIndex]}) updated`, 'success');
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `workspaces/${activeWorkspaceId}/kpis/${k.id}`);
+      }
+    },
+    [activeWorkspaceId, kpis, activeRole, goals, initiatives, today, toast]
   );
 
   const commitCsvImport = useCallback(
@@ -1726,41 +1904,54 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     [activeWorkspaceId, activeRole, kpis, goals, initiatives, today, baseFields, addHistoryEntry, toast, failMutation]
   );
 
-  const cycleMatrixRelation = useCallback(
-    async (from: string, to: string) => {
+  const setMatrixRelationStrength = useCallback(
+    async (from: string, to: string, strength: 0 | 0.5 | 1 | 2, note?: string) => {
       if (!activeWorkspaceId) return;
       if (!roleCan(activeRole, 'matrixEdit', { from, to }, { goals, initiatives })) {
         toast('Only an authorized goal owner can edit this relationship', 'error');
         return;
       }
       const existing = relations.find((r) => r.from === from && r.to === to);
-      const cur = Number(existing?.strength || 0);
-      const next = cur === 0 ? 0.5 : cur === 0.5 ? 1 : cur === 1 ? 2 : 0;
       const docId = existing?.id || toValidDocId(`${from}__${to}`);
       const ref = doc(db, 'workspaces', activeWorkspaceId, 'relations', docId);
       try {
-        if (next === 0 && existing) {
-          await deleteDoc(ref);
+        if (strength === 0) {
+          if (existing) await deleteDoc(ref);
         } else if (existing) {
-          await updateDoc(ref, { strength: next, updatedAt: serverTimestamp() });
-        } else if (next > 0) {
+          const patch: Record<string, any> = { strength, updatedAt: serverTimestamp() };
+          if (note !== undefined) patch.note = note.trim();
+          await updateDoc(ref, patch);
+        } else {
           await setDoc(ref, {
             ...baseFields(),
             id: docId,
             from,
             to,
-            strength: next,
-            note: '',
+            strength,
+            note: (note || '').trim(),
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
         }
-        toast(`Relationship set to ${next === 2 ? 'Strong' : next === 1 ? 'Medium' : next === 0.5 ? 'Weak' : 'None'}`, 'success');
+        toast(
+          `Relationship set to ${strength === 2 ? 'Strong' : strength === 1 ? 'Medium' : strength === 0.5 ? 'Weak' : 'None'}`,
+          'success'
+        );
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/relations/${docId}`);
       }
     },
     [activeWorkspaceId, activeRole, goals, initiatives, relations, baseFields, toast]
+  );
+
+  const cycleMatrixRelation = useCallback(
+    async (from: string, to: string) => {
+      const existing = relations.find((r) => r.from === from && r.to === to);
+      const cur = Number(existing?.strength || 0);
+      const next: 0 | 0.5 | 1 | 2 = cur === 0 ? 0.5 : cur === 0.5 ? 1 : cur === 1 ? 2 : 0;
+      await setMatrixRelationStrength(from, to, next);
+    },
+    [relations, setMatrixRelationStrength]
   );
 
   const editMatrixNote = useCallback(
@@ -1795,41 +1986,54 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     [activeWorkspaceId, activeRole, goals, initiatives, relations, showModal, toast]
   );
 
-  const cycleKpiOwner = useCallback(
-    async (kpiId: string, ownerName: string) => {
+  const setKpiOwnerStrength = useCallback(
+    async (kpiId: string, ownerName: string, strength: 0 | 1 | 2, note?: string) => {
       if (!activeWorkspaceId) return;
       if (!(activeRole === 'Administratör' || leadershipRole(activeRole) || activeRole === 'Department director')) {
         toast('Only leadership or department directors can edit ownership', 'error');
         return;
       }
       const existing = kpiOwners.find((x) => x.kpi === kpiId && x.owner === ownerName);
-      const cur = Number(existing?.strength || 0);
-      const next = cur === 0 ? 1 : cur === 1 ? 2 : 0;
       const docId = existing?.id || toValidDocId(`${kpiId}__${ownerName}`);
       const ref = doc(db, 'workspaces', activeWorkspaceId, 'kpiOwners', docId);
       try {
-        if (next === 0 && existing) {
-          await deleteDoc(ref);
+        if (strength === 0) {
+          if (existing) await deleteDoc(ref);
         } else if (existing) {
-          await updateDoc(ref, { strength: next, updatedAt: serverTimestamp() });
-        } else if (next > 0) {
+          const patch: Record<string, any> = { strength, updatedAt: serverTimestamp() };
+          if (note !== undefined) patch.note = note.trim();
+          await updateDoc(ref, patch);
+        } else {
           await setDoc(ref, {
             ...baseFields(),
             id: docId,
             kpi: kpiId,
             owner: ownerName,
-            strength: next,
-            note: '',
+            strength,
+            note: (note || '').trim(),
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
         }
-        toast(`${ownerName}: ${next === 2 ? 'Primary Owner' : next === 1 ? 'Cross-Functional Support' : 'Removed'}`, 'success');
+        toast(
+          `${ownerName}: ${strength === 2 ? 'Primary Owner' : strength === 1 ? 'Cross-Functional Support' : 'Removed'}`,
+          'success'
+        );
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/kpiOwners/${docId}`);
       }
     },
     [activeWorkspaceId, activeRole, kpiOwners, baseFields, toast]
+  );
+
+  const cycleKpiOwner = useCallback(
+    async (kpiId: string, ownerName: string) => {
+      const existing = kpiOwners.find((x) => x.kpi === kpiId && x.owner === ownerName);
+      const cur = Number(existing?.strength || 0);
+      const next: 0 | 1 | 2 = cur === 0 ? 1 : cur === 1 ? 2 : 0;
+      await setKpiOwnerStrength(kpiId, ownerName, next);
+    },
+    [kpiOwners, setKpiOwnerStrength]
   );
 
   const editKpiOwnerNote = useCallback(
@@ -1940,6 +2144,119 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     },
     [activeWorkspaceId, initiatives, activeRole, goals, toast, failMutation]
+  );
+
+  const createKpi = useCallback(
+    async (input: {
+      name: string;
+      unit: string;
+      direction: 'higher' | 'lower' | 'range';
+      tolerance: number;
+      monthlyTarget: number;
+      initialActual?: number | null;
+      source?: string;
+    }): Promise<string | null> => {
+      if (!activeWorkspaceId) return null;
+      if (!(activeRole === 'Administratör' || leadershipRole(activeRole))) {
+        toast('Endast Administratör, General director eller QMS auditor kan skapa nya KPI-definitioner', 'error');
+        return null;
+      }
+      const cleanName = String(input.name || '').trim().slice(0, 200);
+      if (!cleanName) {
+        toast('Ange ett namn på KPI:n', 'error');
+        return null;
+      }
+      const id = nextCode(kpis.map((k) => k.id), 'K');
+      const targetNum = Number.isFinite(Number(input.monthlyTarget)) ? Number(input.monthlyTarget) : 0;
+      const tolNum = Math.max(0, Number.isFinite(Number(input.tolerance)) ? Number(input.tolerance) : 0);
+      const targets: Array<number | null> = Array.from({ length: 12 }, () => targetNum);
+      const values: Array<number | null> = Array.from({ length: 12 }, (_, idx) =>
+        idx === 0 && input.initialActual !== undefined && input.initialActual !== null && Number.isFinite(Number(input.initialActual))
+          ? Number(input.initialActual)
+          : null
+      );
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'workspaces', activeWorkspaceId, 'kpis', id), {
+        ...baseFields(),
+        id,
+        name: cleanName,
+        unit: String(input.unit || '%').trim().slice(0, 40),
+        direction: input.direction,
+        tolerance: tolNum,
+        values,
+        targets,
+        source: String(input.source || 'Manual entry').trim().slice(0, 200),
+        sourceUpdated: today,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      addHistoryEntry(batch, `KPI ${id} (${cleanName}) skapad`);
+      try {
+        await batch.commit();
+        toast(`KPI ${id} · ${cleanName} skapad`, 'success');
+        return id;
+      } catch (err) {
+        return failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/kpis/${id}`, 'Kunde inte skapa KPI');
+      }
+    },
+    [activeWorkspaceId, activeRole, kpis, baseFields, today, addHistoryEntry, toast, failMutation]
+  );
+
+  const createProjectA3 = useCallback(
+    async (input: {
+      title: string;
+      initiative: string;
+      owner: string;
+      escalationTier?: EscalationTier;
+      problem?: string;
+      current?: string;
+      target?: string;
+      root?: string;
+      fiveWhys?: FiveWhyStep[];
+      counter?: string;
+      learning?: string;
+    }): Promise<string | null> => {
+      if (!activeWorkspaceId) return null;
+      if (!roleCan(activeRole, 'projectWrite', { initiative: input.initiative }, { goals, initiatives })) {
+        toast('Din roll saknar behörighet att skapa Project A3 under detta initiativ', 'error');
+        return null;
+      }
+      const cleanTitle = String(input.title || '').trim().slice(0, 200);
+      if (!cleanTitle || !input.initiative) {
+        toast('Ange projekttitel och kopplat initiativ', 'error');
+        return null;
+      }
+      const id = nextCode(projects.map((p) => p.id), 'P');
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'workspaces', activeWorkspaceId, 'projects', id), {
+        ...baseFields(),
+        id,
+        title: cleanTitle,
+        initiative: input.initiative,
+        owner: (String(input.owner || '').trim() || 'Project Leader').slice(0, 120),
+        status: 'Planned',
+        progress: 0,
+        escalationTier: input.escalationTier || 'Full A3',
+        problem: String(input.problem || '').slice(0, 3000),
+        current: String(input.current || '').slice(0, 2000),
+        target: String(input.target || '').slice(0, 2000),
+        root: String(input.root || '').slice(0, 3000),
+        fiveWhys: (input.fiveWhys || []).slice(0, 5),
+        counter: String(input.counter || '').slice(0, 3000),
+        learning: String(input.learning || '').slice(0, 3000),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      addHistoryEntry(batch, `Project A3 ${id} (${cleanTitle}) skapad under ${input.initiative}`);
+      try {
+        await batch.commit();
+        toast(`Project A3 ${id} skapad`, 'success');
+        return id;
+      } catch (err) {
+        return failMutation(err, OperationType.WRITE, `workspaces/${activeWorkspaceId}/projects/${id}`, 'Kunde inte skapa Project A3');
+      }
+    },
+    [activeWorkspaceId, activeRole, goals, initiatives, projects, baseFields, addHistoryEntry, toast, failMutation]
   );
 
   const saveProjectA3 = useCallback(
@@ -3333,6 +3650,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     activeWorkspace,
     switchWorkspace,
     createWorkspace,
+    createBlankWorkspace,
     seedOrResetWorkspace,
     retryWorkspaceSetup,
     theme,
@@ -3384,13 +3702,18 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     decideApproval,
     revisePlan,
     recordKpiActual,
+    updateKpiMonth,
+    createKpi,
     commitCsvImport,
     cycleMatrixRelation,
+    setMatrixRelationStrength,
     editMatrixNote,
     cycleKpiOwner,
+    setKpiOwnerStrength,
     editKpiOwnerNote,
     createInitiative,
     updateInitiativeFocus,
+    createProjectA3,
     saveProjectA3,
     addProjectTask,
     toggleTaskStatus,

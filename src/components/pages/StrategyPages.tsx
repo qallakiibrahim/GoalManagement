@@ -28,6 +28,7 @@ import {
 import { Card, SectionHeader, StatusBadge } from '../ui/Badge';
 import { ScopeBar } from '../ui/ScopeBar';
 import { BlockerSection } from '../ui/BlockerPanel';
+import { HelpTip } from '../ui/HelpTip';
 
 export const PillarsPage: React.FC = () => {
   const { goals, kpis, initiatives, relations, isoStandards, activeRole, scope, navigate } = useWorkspace();
@@ -54,7 +55,7 @@ export const PillarsPage: React.FC = () => {
 
       <ScopeBar />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div data-tour="pillars-grid" className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {orgGoals.map((pg) => {
           const st = computeKpiStatus(kpiById(kpis, pg.kpi));
           const childGoals = goals.filter((c) => c.parent === pg.id && visibleToRole(c, activeRole));
@@ -248,6 +249,7 @@ export const CascadePage: React.FC = () => {
 
       <ScopeBar />
 
+      <div data-tour="cascade-tree">
       {viewMode === 'tree' ? (
         <div className="space-y-3">{roots.map((r) => renderNode(r))}</div>
       ) : (
@@ -294,6 +296,7 @@ export const CascadePage: React.FC = () => {
           </div>
         </Card>
       )}
+      </div>
     </div>
   );
 };
@@ -530,7 +533,15 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Primary Parent Goal</label>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--muted)] mb-1">
+                  <span>Primary Parent Goal</span>
+                  <HelpTip
+                    title="Målhierarki (Organization → Site → Department)"
+                    body="Primary Parent Goal styr den vertikala spårbarheten i Goal Cascade. Organization-mål är rotmål utan förälder, Site-mål väljer ett Organization-mål, och Department-mål väljer ett Site-mål."
+                    note="Hierarkin i Goal Cascade är separat från påverkansstyrkan (● / ◐ / ○) som du ställer in mellan mål, initiativ och KPI:er i X-Matrix."
+                    chapterId={3}
+                  />
+                </label>
                 <select
                   disabled={!canEdit || level === 'Organization'}
                   value={level === 'Organization' ? '' : parent}
@@ -627,7 +638,15 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
 
           {/* ISO 6.2 Planning Card */}
           <Card className="p-5 space-y-4">
-            <h2 className="text-sm font-bold text-[var(--ink)]">ISO 9001 / 14001 / 45001 Clause 6.2 Planning</h2>
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-sm font-bold text-[var(--ink)]">ISO 9001 / 14001 / 45001 Clause 6.2 Planning</h2>
+              <HelpTip
+                title="ISO 6.2 Planeringsfält"
+                body="Enligt ISO 9001/14001/45001 avsnitt 6.2 ska varje kvalitets-, miljö- och arbetsmiljömål dokumentera vad som ska göras, vilka resurser som krävs, vem som ansvarar, när det ska vara klart samt hur resultatet utvärderas."
+                note="Komplettera samtliga fält här samt länka minst en ISO-klausul och en KPI för att målet ska markeras som planeringsmässigt komplett."
+                chapterId={10}
+              />
+            </div>
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Description / Intent</label>
@@ -776,8 +795,17 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
         {/* Right Side Checklist + Blockers */}
         <div className="space-y-4">
           <Card className="p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-[var(--ink)]">ISO Readiness Checklist</h2>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-sm font-bold text-[var(--ink)]">ISO Readiness Checklist</h2>
+                <HelpTip
+                  title="ISO Ready ≠ Verifierad ISO-efterlevnad"
+                  body="Checklistan kontrollerar att alla obligatoriska planeringsfält enligt avsnitt 6.2 är ifyllda (8 fält + överordnat mål för Site/Department)."
+                  note="Status 'Ready' betyder komplett planeringsunderlag — faktisk ISO-efterlevnad kräver mätta KPI-utfall, dokumenterade PDCA-beslut och spårbara revisionsbevis."
+                  chapterId={10}
+                  align="right"
+                />
+              </div>
               <StatusBadge label={planCheck.ready ? 'Ready' : 'Incomplete'} tone={planCheck.ready ? 'green' : 'amber'} />
             </div>
             <div className="space-y-1.5">

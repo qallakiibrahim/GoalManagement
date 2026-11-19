@@ -1,5 +1,7 @@
 import React from 'react';
 import { WorkspaceProvider, useWorkspace } from './context/WorkspaceContext';
+import { WalkthroughProvider } from './context/WalkthroughContext';
+import { WalkthroughOverlay } from './components/ui/WalkthroughOverlay';
 import { AppShell } from './components/layout/AppShell';
 import { OverviewPage } from './components/pages/OverviewPage';
 import { DailyBoardPage } from './components/pages/DailyBoardPage';
@@ -19,6 +21,8 @@ import {
 } from './components/pages/AlignmentPages';
 import { EvidencePage, IsoPage, ManagementReviewPage } from './components/pages/CompliancePages';
 import { SettingsPage } from './components/pages/SettingsPage';
+import { SopGuidePage } from './components/pages/SopGuidePage';
+import { OnboardingWizardPage } from './components/pages/OnboardingWizardPage';
 
 const RouteView: React.FC = () => {
   const { route, activeRole, isActualAdmin } = useWorkspace();
@@ -34,6 +38,10 @@ const RouteView: React.FC = () => {
   switch (route) {
     case 'overview':
       return <OverviewPage />;
+    case 'sop':
+      return <SopGuidePage />;
+    case 'onboarding':
+      return <OnboardingWizardPage />;
     case 'daily':
       return <DailyBoardPage />;
     case 'myfocus':
@@ -90,9 +98,12 @@ const RouteView: React.FC = () => {
 export default function App() {
   return (
     <WorkspaceProvider>
-      <AppShell>
-        <RouteView />
-      </AppShell>
+      <WalkthroughProvider>
+        <AppShell>
+          <RouteView />
+        </AppShell>
+        <WalkthroughOverlay />
+      </WalkthroughProvider>
     </WorkspaceProvider>
   );
 }
