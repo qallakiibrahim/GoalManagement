@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const ModalHost: React.FC = () => {
   const { modal, closeModal } = useWorkspace();
+  const { t } = useLanguage();
   const [promptVal, setPromptVal] = useState('');
   const [counterTarget, setCounterTarget] = useState('');
   const [counterResources, setCounterResources] = useState('');
@@ -72,11 +74,11 @@ export const ModalHost: React.FC = () => {
     }
     if (modal.type === 'prompt') {
       if (modal.required && !promptVal.trim()) {
-        setErrorMsg('Please enter a value before continuing.');
+        setErrorMsg(t('Please enter a value before continuing.', 'Ange ett värde innan du fortsätter.'));
         return;
       }
       if (modal.isNumber && (!promptVal.trim() || !Number.isFinite(Number(promptVal)))) {
-        setErrorMsg('Please enter a valid number.');
+        setErrorMsg(t('Please enter a valid number.', 'Ange ett giltigt tal.'));
         return;
       }
       closeModal(promptVal.trim());
@@ -84,11 +86,11 @@ export const ModalHost: React.FC = () => {
     }
     if (modal.type === 'counter') {
       if (!counterTarget.trim() || !Number.isFinite(Number(counterTarget))) {
-        setErrorMsg('Enter a valid numeric target.');
+        setErrorMsg(t('Enter a valid numeric target.', 'Ange ett giltigt numeriskt målvärde.'));
         return;
       }
       if (!counterReason.trim()) {
-        setErrorMsg('Counterproposal rationale is required.');
+        setErrorMsg(t('Counterproposal rationale is required.', 'Motivering för motförslaget krävs.'));
         return;
       }
       closeModal({
@@ -100,7 +102,7 @@ export const ModalHost: React.FC = () => {
     }
     if (modal.type === 'escalate') {
       if (!escSummary.trim() || !escNeededAction.trim()) {
-        setErrorMsg('Both blocker summary and requested management decision are required.');
+        setErrorMsg(t('Both blocker summary and requested management decision are required.', 'Både sammanfattning av hindret och önskat ledningsbeslut krävs.'));
         return;
       }
       closeModal({
@@ -113,7 +115,7 @@ export const ModalHost: React.FC = () => {
     }
     if (modal.type === 'pdcaDecision') {
       if (!pdcaText.trim() || !pdcaOwner.trim() || !pdcaDue.trim()) {
-        setErrorMsg('Decision text, accountable owner, and due date are required.');
+        setErrorMsg(t('Decision text, accountable owner, and due date are required.', 'Beslutstext, ansvarig och slutdatum krävs.'));
         return;
       }
       closeModal({
@@ -128,11 +130,11 @@ export const ModalHost: React.FC = () => {
       const aTrim = kpiActualInput.trim();
       const tTrim = kpiTargetInput.trim();
       if (aTrim !== '' && !Number.isFinite(Number(aTrim))) {
-        setErrorMsg('Actual must be a valid number or left blank.');
+        setErrorMsg(t('Actual must be a valid number or left blank.', 'Utfall måste vara ett giltigt tal eller lämnas tomt.'));
         return;
       }
       if (tTrim !== '' && !Number.isFinite(Number(tTrim))) {
-        setErrorMsg('Target must be a valid number or left blank.');
+        setErrorMsg(t('Target must be a valid number or left blank.', 'Målvärde måste vara ett giltigt tal eller lämnas tomt.'));
         return;
       }
       closeModal({
@@ -188,7 +190,7 @@ export const ModalHost: React.FC = () => {
                 step="any"
                 value={promptVal}
                 onChange={(e) => setPromptVal(e.target.value)}
-                placeholder={modal.placeholder || 'Enter value...'}
+                placeholder={modal.placeholder || t('Enter value...', 'Ange värde...')}
                 className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-600/25 focus:border-teal-700 dark:focus:ring-teal-400/25 dark:focus:border-teal-400"
               />
             </div>
@@ -197,7 +199,9 @@ export const ModalHost: React.FC = () => {
           {modal.type === 'counter' && (
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Proposed Target</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
+                  {t('Proposed Target', 'Föreslaget målvärde')}
+                </label>
                 <input
                   autoFocus
                   type="number"
@@ -208,7 +212,9 @@ export const ModalHost: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Resources Required</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
+                  {t('Resources Required', 'Resursbehov')}
+                </label>
                 <input
                   type="text"
                   value={counterResources}
@@ -217,12 +223,14 @@ export const ModalHost: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Rationale (required)</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
+                  {t('Rationale (required)', 'Motivering (obligatorisk)')}
+                </label>
                 <textarea
                   rows={3}
                   value={counterReason}
                   onChange={(e) => setCounterReason(e.target.value)}
-                  placeholder="Explain trade-offs, capacity, or target assumptions..."
+                  placeholder={t('Explain trade-offs, capacity, or target assumptions...', 'Förklara avvägningar, kapacitet eller antaganden...')}
                   className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-600/25 focus:border-teal-700 dark:focus:ring-teal-400/25 dark:focus:border-teal-400"
                 />
               </div>
@@ -233,51 +241,59 @@ export const ModalHost: React.FC = () => {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Category</label>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
+                    {t('Category', 'Kategori')}
+                  </label>
                   <select
                     value={escCategory}
                     onChange={(e) => setEscCategory(e.target.value)}
                     className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)]"
                   >
-                    <option value="Resource">Resource</option>
-                    <option value="Budget">Budget</option>
-                    <option value="Technical">Technical</option>
-                    <option value="Cross-functional">Cross-functional</option>
-                    <option value="Safety">Safety</option>
-                    <option value="Supplier">Supplier</option>
+                    <option value="Resource">{t('Resource', 'Resurs')}</option>
+                    <option value="Budget">{t('Budget', 'Budget')}</option>
+                    <option value="Technical">{t('Technical', 'Teknisk')}</option>
+                    <option value="Cross-functional">{t('Cross-functional', 'Tvärfunktionell')}</option>
+                    <option value="Safety">{t('Safety', 'Säkerhet')}</option>
+                    <option value="Supplier">{t('Supplier', 'Leverantör')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Severity</label>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
+                    {t('Severity', 'Allvarlighetsgrad')}
+                  </label>
                   <select
                     value={escSeverity}
                     onChange={(e) => setEscSeverity(e.target.value)}
                     className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)]"
                   >
-                    <option value="Critical">Critical</option>
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
+                    <option value="Critical">{t('Critical', 'Kritisk')}</option>
+                    <option value="High">{t('High', 'Hög')}</option>
+                    <option value="Medium">{t('Medium', 'Medel')}</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">What is blocked? (required)</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
+                  {t('What is blocked? (required)', 'Vad är blockerat? (obligatoriskt)')}
+                </label>
                 <textarea
                   autoFocus
                   rows={2}
                   value={escSummary}
                   onChange={(e) => setEscSummary(e.target.value)}
-                  placeholder="Describe the operational obstacle or deviation..."
+                  placeholder={t('Describe the operational obstacle or deviation...', 'Beskriv hindret eller avvikelsen...')}
                   className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Decision / Support Needed (required)</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
+                  {t('Decision / Support Needed (required)', 'Beslut / stöd som krävs (obligatoriskt)')}
+                </label>
                 <textarea
                   rows={2}
                   value={escNeededAction}
                   onChange={(e) => setEscNeededAction(e.target.value)}
-                  placeholder="Specify the decision, funding, or cross-functional escalation needed..."
+                  placeholder={t('Specify the decision, funding, or cross-functional escalation needed...', 'Specificera beslut, budget eller tvärfunktionellt stöd...')}
                   className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)]"
                 />
               </div>
@@ -287,7 +303,9 @@ export const ModalHost: React.FC = () => {
           {modal.type === 'pdcaDecision' && (
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Target PDCA Review</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
+                  {t('Target PDCA Review', 'PDCA-genomgång')}
+                </label>
                 <select
                   value={pdcaReviewId}
                   onChange={(e) => setPdcaReviewId(e.target.value)}
@@ -298,11 +316,13 @@ export const ModalHost: React.FC = () => {
                       {r.label}
                     </option>
                   ))}
-                  <option value="__new__">+ Create new PDCA Review for this decision</option>
+                  <option value="__new__">{t('+ Create new PDCA Review for this decision', '+ Skapa ny PDCA-genomgång för detta beslut')}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">PDCA Decision / Action</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
+                  {t('PDCA Decision / Action', 'PDCA-beslut / Åtgärd')}
+                </label>
                 <textarea
                   autoFocus
                   rows={2}
@@ -313,7 +333,9 @@ export const ModalHost: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Accountable Owner</label>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
+                    {t('Accountable Owner', 'Ansvarig')}
+                  </label>
                   <input
                     type="text"
                     value={pdcaOwner}
@@ -322,7 +344,9 @@ export const ModalHost: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Due Date</label>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
+                    {t('Due Date', 'Slutdatum')}
+                  </label>
                   <input
                     type="date"
                     value={pdcaDue}
@@ -339,7 +363,7 @@ export const ModalHost: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
-                    Actual ({modal.kpiMonth.unit || 'value'})
+                    {t('Actual', 'Utfall')} ({modal.kpiMonth.unit || t('value', 'värde')})
                   </label>
                   <input
                     autoFocus
@@ -347,32 +371,32 @@ export const ModalHost: React.FC = () => {
                     step="any"
                     value={kpiActualInput}
                     onChange={(e) => setKpiActualInput(e.target.value)}
-                    placeholder="Leave blank to clear"
+                    placeholder={t('Leave blank to clear', 'Lämna tomt för att rensa')}
                     className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm font-mono tabular-nums text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-600/25 focus:border-teal-700 dark:focus:ring-teal-400/25 dark:focus:border-teal-400"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
-                    Target ({modal.kpiMonth.unit || 'value'})
+                    {t('Target', 'Målvärde')} ({modal.kpiMonth.unit || t('value', 'värde')})
                   </label>
                   <input
                     type="number"
                     step="any"
                     value={kpiTargetInput}
                     onChange={(e) => setKpiTargetInput(e.target.value)}
-                    placeholder="Leave blank to clear"
+                    placeholder={t('Leave blank to clear', 'Lämna tomt för att rensa')}
                     className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-sm font-mono tabular-nums text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-teal-600/25 focus:border-teal-700 dark:focus:ring-teal-400/25 dark:focus:border-teal-400"
                   />
                 </div>
               </div>
               <div className="flex items-center justify-between text-[11px] text-[var(--muted)]">
-                <span>Leave Actual blank if this month is not yet reported.</span>
+                <span>{t('Leave Actual blank if this month is not yet reported.', 'Lämna utfall tomt om månaden inte rapporterats ännu.')}</span>
                 <button
                   type="button"
                   onClick={() => closeModal({ actual: null, target: null })}
                   className="font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
                 >
-                  Clear month
+                  {t('Clear month', 'Rensa månad')}
                 </button>
               </div>
             </div>
@@ -387,7 +411,7 @@ export const ModalHost: React.FC = () => {
                 onClick={cancel}
                 className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--surface-subtle)] cursor-pointer"
               >
-                Cancel
+                {t('Cancel', 'Avbryt')}
               </button>
             )}
             <button
@@ -397,10 +421,10 @@ export const ModalHost: React.FC = () => {
               {modal.type === 'alert'
                 ? 'OK'
                 : modal.type === 'confirm'
-                  ? 'Confirm'
+                  ? t('Confirm', 'Bekräfta')
                   : modal.type === 'kpiMonth'
-                    ? 'Save Month'
-                    : 'Save & Continue'}
+                    ? t('Save Month', 'Spara månad')
+                    : t('Save & Continue', 'Spara & fortsätt')}
             </button>
           </div>
         </form>

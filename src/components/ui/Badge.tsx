@@ -1,6 +1,7 @@
 import React from 'react';
 import { Initiative } from '../../types/safeqms';
 import { sqdcScore } from '../../domain/syncEngine';
+import { useLanguage } from '../../context/LanguageContext';
 
 type Tone = 'green' | 'amber' | 'red' | 'blue' | 'teal' | 'slate';
 
@@ -53,12 +54,13 @@ export const StatusBadge: React.FC<{
   tone?: Tone;
   className?: string;
 }> = ({ label, tone, className = '' }) => {
+  const { tStatus } = useLanguage();
   const resolved = tone || STATUS_TONE[label] || 'slate';
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold tracking-tight whitespace-nowrap ${TONE_CLASSES[resolved]} ${className}`}
     >
-      {label}
+      {tStatus(label)}
     </span>
   );
 };
@@ -94,6 +96,7 @@ export const SqdcStrip: React.FC<{
   initiative: Initiative;
   compact?: boolean;
 }> = ({ initiative, compact = false }) => {
+  const { t } = useLanguage();
   const { s, weighted } = sqdcScore(initiative);
   return (
     <div className="inline-flex items-center gap-2 flex-wrap">
@@ -109,7 +112,7 @@ export const SqdcStrip: React.FC<{
           return (
             <span
               key={key}
-              title={`${label} (${key}): ${val === 2 ? 'Primary (2)' : val === 1 ? 'Secondary (1)' : 'None (0)'}`}
+              title={`${t(label)} (${key}): ${val === 2 ? t('Primary (2)', 'Primär (2)') : val === 1 ? t('Secondary (1)', 'Sekundär (1)') : t('None (0)', 'Ingen (0)')}`}
               className={`inline-flex items-center justify-center rounded border text-[10px] font-bold font-mono tabular-nums ${
                 compact ? 'w-5 h-5' : 'px-1.5 h-5 gap-0.5 min-w-[26px]'
               } ${color}`}
@@ -124,12 +127,12 @@ export const SqdcStrip: React.FC<{
       </div>
       {!compact && (
         <span className="text-[11px] font-mono tabular-nums text-[var(--muted)]">
-          Score {weighted}/8
+          {t('Score', 'Poäng')} {weighted}/8
         </span>
       )}
       {initiative.isBottleneck && (
         <span className="inline-flex items-center rounded border border-amber-600/25 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300">
-          TOC Bottleneck
+          {t('TOC Bottleneck', 'TOC-flaskhals')}
         </span>
       )}
     </div>

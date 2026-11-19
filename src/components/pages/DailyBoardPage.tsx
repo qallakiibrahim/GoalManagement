@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { ALL_SCOPES, ASSIGNED_DEPARTMENT, ASSIGNED_SITE, PulseCard, SafetyDayState } from '../../types/safeqms';
+import { useLanguage } from '../../context/LanguageContext';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import {
   blockerMatchesScope,
@@ -51,6 +52,7 @@ const MONTHS_2027 = [
 ];
 
 export const DailyBoardPage: React.FC = () => {
+  const { t, tScope } = useLanguage();
   const {
     scope,
     setScope,
@@ -226,9 +228,9 @@ export const DailyBoardPage: React.FC = () => {
 
   const renderKanbanBoard = () => {
     const columns: Array<{ status: PulseCard['status']; title: string; subtitle: string }> = [
-      { status: 'Team action', title: 'Team Action', subtitle: 'Owned by shift / tier 1 team' },
-      { status: 'Escalated', title: 'Escalated', subtitle: 'Tier 2/3 & PDCA support needed' },
-      { status: 'Done', title: 'Done', subtitle: 'Verified & closed countermeasures' },
+      { status: 'Team action', title: t('Team Action', 'Teamåtgärd'), subtitle: t('Owned by shift / tier 1 team', 'Ägs av skift / nivå 1-team') },
+      { status: 'Escalated', title: t('Escalated', 'Eskalerad'), subtitle: t('Tier 2/3 & PDCA support needed', 'Kräver nivå 2/3- & PDCA-stöd') },
+      { status: 'Done', title: t('Done', 'Klar'), subtitle: t('Verified & closed countermeasures', 'Verifierade & stängda åtgärder') },
     ];
 
     return (
@@ -243,7 +245,7 @@ export const DailyBoardPage: React.FC = () => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search Kanban cards..."
+                  placeholder={t('Search Kanban cards...', 'Sök Kanban-kort...')}
                   className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] pl-8 pr-3 py-1.5 text-xs text-[var(--ink)]"
                 />
               </div>
@@ -252,17 +254,17 @@ export const DailyBoardPage: React.FC = () => {
                 onChange={(e) => setRouteFilter(e.target.value)}
                 className="rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 text-xs font-medium text-[var(--ink)]"
               >
-                <option value="ALL">All paths</option>
-                <option value="Direct fix">Direct fix</option>
+                <option value="ALL">{t('All paths', 'Alla spår')}</option>
+                <option value="Direct fix">{t('Direct fix', 'Snabbåtgärd')}</option>
                 <option value="A3">A3</option>
-                <option value="Escalate">Escalate</option>
+                <option value="Escalate">{t('Escalate', 'Eskalera')}</option>
               </select>
               <select
                 value={ownerFilter}
                 onChange={(e) => setOwnerFilter(e.target.value)}
                 className="rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 text-xs font-medium text-[var(--ink)]"
               >
-                <option value="ALL">All owners</option>
+                <option value="ALL">{t('All owners', 'Alla ägare')}</option>
                 {uniqueOwners.map((o) => (
                   <option key={o} value={o}>
                     {o}
@@ -271,7 +273,7 @@ export const DailyBoardPage: React.FC = () => {
               </select>
             </div>
             <span className="text-xs text-[var(--muted)]">
-              Drag cards across columns or click any card to inspect details
+              {t('Drag cards across columns or click any card to inspect details', 'Dra kort mellan kolumner eller klicka på ett kort för detaljer')}
             </span>
           </div>
 
@@ -281,7 +283,7 @@ export const DailyBoardPage: React.FC = () => {
                 type="text"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="Add Tier 1 deviation, countermeasure, or stand-up action..."
+                placeholder={t('Add Tier 1 deviation, countermeasure, or stand-up action...', 'Lägg till avvikelse, motåtgärd eller daglig åtgärd...')}
                 className="md:col-span-5 rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-1.5 text-xs text-[var(--ink)]"
               />
               <select
@@ -289,16 +291,16 @@ export const DailyBoardPage: React.FC = () => {
                 onChange={(e) => setNewRoute(e.target.value as PulseCard['routeType'])}
                 className="md:col-span-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 text-xs text-[var(--ink)]"
               >
-                <option value="Direct fix">Direct fix</option>
+                <option value="Direct fix">{t('Direct fix', 'Snabbåtgärd')}</option>
                 <option value="A3">A3</option>
-                <option value="Escalate">Escalate</option>
+                <option value="Escalate">{t('Escalate', 'Eskalera')}</option>
               </select>
               <select
                 value={newKpi}
                 onChange={(e) => setNewKpi(e.target.value)}
                 className="md:col-span-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 text-xs text-[var(--ink)]"
               >
-                <option value="">No KPI link</option>
+                <option value="">{t('No KPI link', 'Ingen KPI-koppling')}</option>
                 {kpis.map((k) => (
                   <option key={k.id} value={k.id}>
                     {k.id} · {k.name}
@@ -312,7 +314,7 @@ export const DailyBoardPage: React.FC = () => {
                   setOwnerCustomized(true);
                   setNewOwner(e.target.value);
                 }}
-                placeholder="Owner"
+                placeholder={t('Owner', 'Ägare')}
                 className="md:col-span-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 text-xs text-[var(--ink)]"
               />
               <button
@@ -320,7 +322,7 @@ export const DailyBoardPage: React.FC = () => {
                 className="md:col-span-1 inline-flex items-center justify-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Add
+                {t('Add', 'Lägg till')}
               </button>
             </form>
           )}
@@ -370,7 +372,7 @@ export const DailyBoardPage: React.FC = () => {
                 <div className="space-y-2.5">
                   {colCards.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-[var(--border-strong)] p-4 text-center text-xs text-[var(--muted)]">
-                      Drop cards here
+                      {t('Drop cards here', 'Släpp kort här')}
                     </div>
                   ) : (
                     colCards.map((c) => (
@@ -403,21 +405,21 @@ export const DailyBoardPage: React.FC = () => {
                             </div>
                           </button>
                           {!readOnly && (
-                            <span className="text-[var(--muted)] cursor-grab pt-0.5" title="Drag card">
+                            <span className="text-[var(--muted)] cursor-grab pt-0.5" title={t('Drag card', 'Dra kort')}>
                               <GripVertical className="w-3.5 h-3.5" />
                             </span>
                           )}
                         </div>
 
                         <div className="text-[11px] text-[var(--muted)]">
-                          {c.owner} · {c.scope}
-                          {c.due ? ` · Due ${c.due}` : ''}
+                          {c.owner} · {tScope(c.scope)}
+                          {c.due ? ` · ${t('Due', 'Förfaller')} ${c.due}` : ''}
                           {c.kpi ? ` · ${c.kpi}` : ''}
                         </div>
 
                         {c.delegatedBy && (
                           <div className="rounded bg-sky-500/10 px-2 py-1 text-[11px] text-sky-800 dark:bg-sky-400/10 dark:text-sky-300">
-                            Delegated by {c.delegatedBy} ({c.delegatedAt})
+                            {t('Delegated by', 'Delegerad av')} {c.delegatedBy} ({c.delegatedAt})
                           </div>
                         )}
 
@@ -429,7 +431,7 @@ export const DailyBoardPage: React.FC = () => {
                               onClick={() => togglePulseCardDone(c.id)}
                               className="rounded border border-[var(--border-strong)] px-2 py-0.5 text-[11px] font-semibold text-[var(--ink)] hover:bg-[var(--surface-subtle)] cursor-pointer"
                             >
-                              {c.status === 'Done' ? 'Reopen' : '✓ Done'}
+                              {c.status === 'Done' ? t('Reopen', 'Återöppna') : t('✓ Done', '✓ Klar')}
                             </button>
                             {c.status !== 'Escalated' && (
                               <button
@@ -437,7 +439,7 @@ export const DailyBoardPage: React.FC = () => {
                                 onClick={() => escalatePulseCard(c.id)}
                                 className="rounded border border-rose-600/25 bg-rose-500/10 px-2 py-0.5 text-[11px] font-semibold text-rose-800 hover:bg-rose-500/15 dark:border-rose-400/25 dark:bg-rose-400/10 dark:text-rose-300 cursor-pointer"
                               >
-                                ↑ Escalate
+                                {t('↑ Escalate', '↑ Eskalera')}
                               </button>
                             )}
                             <button
@@ -455,7 +457,7 @@ export const DailyBoardPage: React.FC = () => {
                               className="inline-flex items-center gap-1 rounded border border-[var(--border-strong)] px-2 py-0.5 text-[11px] font-semibold text-[var(--muted)] hover:text-[var(--ink)] cursor-pointer"
                             >
                               <CornerDownRight className="w-3 h-3" />
-                              Delegate
+                              {t('Delegate', 'Delegera')}
                             </button>
                             {c.project && (
                               <button
@@ -471,7 +473,7 @@ export const DailyBoardPage: React.FC = () => {
 
                         {delegateCardId === c.id && (
                           <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] p-2.5 space-y-2 text-xs">
-                            <div className="font-semibold text-[var(--ink)]">Delegate to Team / Owner</div>
+                            <div className="font-semibold text-[var(--ink)]">{t('Delegate to Team / Owner', 'Delegera till team / ägare')}</div>
                             <select
                               value={delegateScope}
                               onChange={(e) => setDelegateScope(e.target.value)}
@@ -479,7 +481,7 @@ export const DailyBoardPage: React.FC = () => {
                             >
                               {ALL_SCOPES.map((s) => (
                                 <option key={s} value={s}>
-                                  {s}
+                                  {tScope(s)}
                                 </option>
                               ))}
                             </select>
@@ -487,14 +489,14 @@ export const DailyBoardPage: React.FC = () => {
                               type="text"
                               value={delegateOwner}
                               onChange={(e) => setDelegateOwner(e.target.value)}
-                              placeholder="New accountable owner"
+                              placeholder={t('New accountable owner', 'Ny ansvarig ägare')}
                               className="w-full rounded border border-[var(--border-strong)] bg-[var(--surface)] px-2 py-1 text-xs"
                             />
                             <input
                               type="text"
                               value={delegateNote}
                               onChange={(e) => setDelegateNote(e.target.value)}
-                              placeholder="Delegation instruction (optional)"
+                              placeholder={t('Delegation instruction (optional)', 'Instruktion (valfritt)')}
                               className="w-full rounded border border-[var(--border-strong)] bg-[var(--surface)] px-2 py-1 text-xs"
                             />
                             <div className="flex justify-end gap-1.5">
@@ -503,7 +505,7 @@ export const DailyBoardPage: React.FC = () => {
                                 onClick={() => setDelegateCardId(null)}
                                 className="rounded border border-[var(--border-strong)] px-2 py-1 text-[11px]"
                               >
-                                Cancel
+                                {t('Cancel', 'Avbryt')}
                               </button>
                               <button
                                 type="button"
@@ -513,7 +515,7 @@ export const DailyBoardPage: React.FC = () => {
                                 }}
                                 className="rounded bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-teal-700"
                               >
-                                Confirm Delegate
+                                {t('Confirm Delegate', 'Bekräfta delegering')}
                               </button>
                             </div>
                           </div>
@@ -533,8 +535,11 @@ export const DailyBoardPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Daily Management Board (Tier 1–3)"
-        subtitle="Real-time operational pulse: Safety Cross calendar, Live KPI status, Drag & Drop Kanban escalation/delegation, and synced Team Tasks."
+        title={t('Daily Management Board (Tier 1–3)', 'Daglig styrning · Daily Board (Nivå 1–3)')}
+        subtitle={t(
+          'Real-time operational pulse: Safety Cross calendar, Live KPI status, Drag & Drop Kanban escalation/delegation, and synced Team Tasks.',
+          'Operativ realtidspuls: Safety Cross-kalender, live KPI-status, dra-och-släpp Kanban med eskalering/delegering samt synkade teamuppgifter.'
+        )}
         actions={
           <div
             data-tour="daily-tiers"
@@ -542,22 +547,22 @@ export const DailyBoardPage: React.FC = () => {
           >
             {(
               [
-                { id: 'tier1', label: 'Tier 1 · Team Pulse' },
-                { id: 'tier2', label: 'Tier 2 · Site Scorecard' },
-                { id: 'tier3', label: 'Tier 3 · Obeya' },
+                { id: 'tier1', label: t('Tier 1 · Team Pulse', 'Nivå 1 · Teampuls') },
+                { id: 'tier2', label: t('Tier 2 · Site Scorecard', 'Nivå 2 · Anläggning') },
+                { id: 'tier3', label: t('Tier 3 · Obeya', 'Nivå 3 · Obeya') },
               ] as const
-            ).map((t) => (
+            ).map((tab) => (
               <button
-                key={t.id}
+                key={tab.id}
                 type="button"
-                onClick={() => setDailyTier(t.id)}
+                onClick={() => setDailyTier(tab.id)}
                 className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
-                  dailyTier === t.id
+                  dailyTier === tab.id
                     ? 'bg-teal-700 text-white dark:bg-teal-600'
                     : 'text-[var(--muted)] hover:text-[var(--ink)]'
                 }`}
               >
-                {t.label}
+                {tab.label}
               </button>
             ))}
           </div>
@@ -574,15 +579,15 @@ export const DailyBoardPage: React.FC = () => {
             <Card className="lg:col-span-5 p-5 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-sm font-bold text-[var(--ink)]">Safety &amp; Quality Cross</h2>
-                  <p className="text-[11px] text-[var(--muted)]">Click day cell: OK → Near-miss → Incident</p>
+                  <h2 className="text-sm font-bold text-[var(--ink)]">{t('Safety & Quality Cross', 'Säkerhets- & Kvalitetskors')}</h2>
+                  <p className="text-[11px] text-[var(--muted)]">{t('Click day cell: OK → Near-miss → Incident', 'Klicka på dag: OK → Tillbud → Incident')}</p>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-[var(--muted)]" />
                   <select
                     value={safetyMonth}
                     onChange={(e) => setSafetyMonth(e.target.value)}
-                    aria-label="Safety Cross month"
+                    aria-label={t('Safety Cross month', 'Månad för Safety Cross')}
                     className="rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2 py-1 text-xs font-semibold text-[var(--ink)] tabular-nums"
                   >
                     {MONTHS_2027.map((m) => (
@@ -604,7 +609,7 @@ export const DailyBoardPage: React.FC = () => {
                       type="button"
                       disabled={readOnly}
                       onClick={() => toggleSafetyDay(scope, safetyMonth, dayNum)}
-                      title={`Day ${dayNum}: ${state === 'green' ? 'Safe / OK' : state === 'amber' ? 'Near-miss / Minor' : state === 'red' ? 'Incident / Deviation' : 'Not logged'}`}
+                      title={`${t('Day', 'Dag')} ${dayNum}: ${state === 'green' ? t('Safe / OK', 'Säker / OK') : state === 'amber' ? t('Near-miss / Minor', 'Tillbud / Mindre') : state === 'red' ? t('Incident / Deviation', 'Incident / Avvikelse') : t('Not logged', 'Ej loggad')}`}
                       className={`sc-cell tabular-nums cursor-pointer ${state || ''}`}
                     >
                       {dayNum}
@@ -616,21 +621,21 @@ export const DailyBoardPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[var(--border)] text-xs">
                 <div className="rounded-lg bg-[var(--surface-subtle)]/60 p-2.5 space-y-1">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                    Selected Month ({safetyMonth})
+                    {t('Selected Month', 'Vald månad')} ({safetyMonth})
                   </div>
                   <div className="font-mono tabular-nums text-[var(--ink)]">
                     <span className="text-emerald-600 dark:text-emerald-400 font-bold">{monthStats.green} OK</span> ·{' '}
-                    <span className="text-amber-600 dark:text-amber-400 font-bold">{monthStats.amber} NM</span> ·{' '}
+                    <span className="text-amber-600 dark:text-amber-400 font-bold">{monthStats.amber} {t('NM', 'Tillb')}</span> ·{' '}
                     <span className="text-rose-600 dark:text-rose-400 font-bold">{monthStats.red} Inc</span>
                   </div>
                 </div>
                 <div className="rounded-lg bg-[var(--surface-subtle)]/60 p-2.5 space-y-1">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                    YTD {ytdYearPrefix} ({ytdStats.monthsLogged} mo)
+                    {t('YTD', 'Ack.')} {ytdYearPrefix} ({ytdStats.monthsLogged} {t('mo', 'mån')})
                   </div>
                   <div className="font-mono tabular-nums text-[var(--ink)]">
                     <span className="text-emerald-600 dark:text-emerald-400 font-bold">{ytdStats.green} OK</span> ·{' '}
-                    <span className="text-amber-600 dark:text-amber-400 font-bold">{ytdStats.amber} NM</span> ·{' '}
+                    <span className="text-amber-600 dark:text-amber-400 font-bold">{ytdStats.amber} {t('NM', 'Tillb')}</span> ·{' '}
                     <span className="text-rose-600 dark:text-rose-400 font-bold">{ytdStats.red} Inc</span>
                   </div>
                 </div>
@@ -641,15 +646,15 @@ export const DailyBoardPage: React.FC = () => {
             <Card className="lg:col-span-7 p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-sm font-bold text-[var(--ink)]">Live KPI Pulse ({scope})</h2>
-                  <p className="text-[11px] text-[var(--muted)]">Latest monthly actual vs target from KPI Bowling Chart</p>
+                  <h2 className="text-sm font-bold text-[var(--ink)]">{t('Live KPI Pulse', 'Live KPI-puls')} ({tScope(scope)})</h2>
+                  <p className="text-[11px] text-[var(--muted)]">{t('Latest monthly actual vs target from KPI Bowling Chart', 'Senaste månadsutfall mot mål från Bowling Chart')}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => navigate('kpis')}
                   className="text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
                 >
-                  Open KPI Charts →
+                  {t('Open KPI Charts →', 'Öppna KPI-diagram →')}
                 </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -670,7 +675,7 @@ export const DailyBoardPage: React.FC = () => {
                       <div className="text-sm font-bold font-mono tabular-nums text-[var(--ink)]">
                         {st.actual !== undefined ? `${st.actual} ${k.unit}` : '—'}{' '}
                         <span className="text-xs font-normal text-[var(--muted)]">
-                          / Target {st.target !== undefined ? `${st.target} ${k.unit}` : '—'}
+                          / {t('Target', 'Mål')} {st.target !== undefined ? `${st.target} ${k.unit}` : '—'}
                         </span>
                       </div>
                     </button>
@@ -686,18 +691,18 @@ export const DailyBoardPage: React.FC = () => {
           <Card className="overflow-hidden">
             <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-bold text-[var(--ink)]">Active Team Tasks ({visibleTasks.length})</h2>
-                <p className="text-xs text-[var(--muted)]">Click task status to cycle Open → In progress → Done (auto-syncs Project A3 &amp; Initiative %)</p>
+                <h2 className="text-sm font-bold text-[var(--ink)]">{t('Active Team Tasks', 'Aktiva teamuppgifter')} ({visibleTasks.length})</h2>
+                <p className="text-xs text-[var(--muted)]">{t('Click task status to cycle Open → In progress → Done (auto-syncs Project A3 & Initiative %)', 'Klicka på status för att växla Öppen → Pågående → Klar (synkar automatiskt Projekt-A3 & Initiativ %)')}</p>
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[var(--surface-subtle)] text-[var(--muted)] border-b border-[var(--border)]">
                   <tr>
-                    <th className="px-4 py-2.5 font-semibold">Task</th>
-                    <th className="px-4 py-2.5 font-semibold">Project A3</th>
-                    <th className="px-4 py-2.5 font-semibold">Owner</th>
-                    <th className="px-4 py-2.5 font-semibold">Due</th>
+                    <th className="px-4 py-2.5 font-semibold">{t('Task', 'Uppgift')}</th>
+                    <th className="px-4 py-2.5 font-semibold">{t('Project A3', 'Projekt-A3')}</th>
+                    <th className="px-4 py-2.5 font-semibold">{t('Owner', 'Ägare')}</th>
+                    <th className="px-4 py-2.5 font-semibold">{t('Due', 'Förfaller')}</th>
                     <th className="px-4 py-2.5 font-semibold">Status</th>
                   </tr>
                 </thead>
@@ -761,28 +766,28 @@ export const DailyBoardPage: React.FC = () => {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="text-sm font-bold text-[var(--ink)]">{sc}</div>
+                      <div className="text-sm font-bold text-[var(--ink)]">{tScope(sc)}</div>
                       <div className="text-xs text-[var(--muted)]">
-                        {scGoals.length} goals · {openBlockers} open blockers
+                        {scGoals.length} {t('goals', 'mål')} · {openBlockers} {t('open blockers', 'öppna hinder')}
                       </div>
                     </div>
                     <StatusBadge
-                      label={openBlockers > 0 || offOrRisk > 0 ? 'Attention' : 'Stable'}
+                      label={openBlockers > 0 || offOrRisk > 0 ? t('Attention', 'Fokus') : t('Stable', 'Stabil')}
                       tone={openBlockers > 0 || offOrRisk > 0 ? 'amber' : 'green'}
                     />
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-center rounded-lg bg-[var(--surface-subtle)]/60 p-2.5 text-xs">
                     <div>
                       <div className="font-mono font-bold tabular-nums text-[var(--ink)]">{offOrRisk}</div>
-                      <div className="text-[10px] text-[var(--muted)]">Risk KPIs</div>
+                      <div className="text-[10px] text-[var(--muted)]">{t('Risk KPIs', 'Risk-KPI')}</div>
                     </div>
                     <div>
                       <div className="font-mono font-bold tabular-nums text-[var(--ink)]">{scCards}</div>
-                      <div className="text-[10px] text-[var(--muted)]">Pulse Open</div>
+                      <div className="text-[10px] text-[var(--muted)]">{t('Pulse Open', 'Öppna kort')}</div>
                     </div>
                     <div>
                       <div className="font-mono font-bold tabular-nums text-[var(--ink)]">{incidents}</div>
-                      <div className="text-[10px] text-[var(--muted)]">Safety Red</div>
+                      <div className="text-[10px] text-[var(--muted)]">{t('Safety Red', 'Röda dagar')}</div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-2 pt-1">
@@ -791,7 +796,7 @@ export const DailyBoardPage: React.FC = () => {
                       onClick={() => setScope(sc)}
                       className="text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] cursor-pointer"
                     >
-                      Filter Tier 2 scope
+                      {t('Filter Tier 2 scope', 'Filtrera nivå 2')}
                     </button>
                     <button
                       type="button"
@@ -801,7 +806,7 @@ export const DailyBoardPage: React.FC = () => {
                       }}
                       className="inline-flex items-center gap-1 rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
                     >
-                      Open Tier 1
+                      {t('Open Tier 1', 'Öppna Nivå 1')}
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -811,9 +816,9 @@ export const DailyBoardPage: React.FC = () => {
           </div>
 
           <Card className="p-5 space-y-3">
-            <h2 className="text-sm font-bold text-[var(--ink)]">Escalated Items for {scope}</h2>
+            <h2 className="text-sm font-bold text-[var(--ink)]">{t('Escalated Items for', 'Eskalerade ärenden för')} {tScope(scope)}</h2>
             {obeyaExceptions.length === 0 ? (
-              <p className="text-xs text-[var(--muted)]">No open escalations in {scope}.</p>
+              <p className="text-xs text-[var(--muted)]">{t('No open escalations in', 'Inga öppna eskaleringar i')} {tScope(scope)}.</p>
             ) : (
               <div className="space-y-3">
                 {obeyaExceptions.map((b) => (
@@ -832,18 +837,20 @@ export const DailyBoardPage: React.FC = () => {
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <h2 className="text-sm font-bold text-[var(--ink)]">Tier 3 Management Obeya · Exception Queue ({obeyaExceptions.length})</h2>
+                <h2 className="text-sm font-bold text-[var(--ink)]">{t('Tier 3 Management Obeya · Exception Queue', 'Nivå 3 Lednings-Obeya · Avvikelsekö')} ({obeyaExceptions.length})</h2>
               </div>
               <button
                 type="button"
                 onClick={() => navigate('reviews')}
                 className="text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
               >
-                Open PDCA Reviews →
+                {t('Open PDCA Reviews →', 'Öppna PDCA-genomgångar →')}
               </button>
             </div>
             {obeyaExceptions.length === 0 ? (
-              <p className="text-xs text-[var(--muted)]">All strategic goals, KPIs, and initiatives in {scope} are operating within tolerance.</p>
+              <p className="text-xs text-[var(--muted)]">
+                {t('All strategic goals, KPIs, and initiatives in', 'Alla strategiska mål, KPI:er och initiativ i')} {tScope(scope)} {t('are operating within tolerance.', 'ligger inom tolerans.')}
+              </p>
             ) : (
               <div className="space-y-3">
                 {obeyaExceptions.map((b) => (
@@ -875,7 +882,7 @@ export const DailyBoardPage: React.FC = () => {
                 </div>
                 <h2 className="mt-1 text-base font-bold text-[var(--ink)]">{drawerCard.title}</h2>
                 <p className="text-xs text-[var(--muted)]">
-                  {drawerCard.scope} · Owner: {drawerCard.owner}
+                  {tScope(drawerCard.scope)} · {t('Owner', 'Ägare')}: {drawerCard.owner}
                 </p>
               </div>
               <button
@@ -891,7 +898,7 @@ export const DailyBoardPage: React.FC = () => {
               {/* Editable Fields */}
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Card Title</label>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Card Title', 'Kortrubrik')}</label>
                   <input
                     type="text"
                     disabled={readOnly}
@@ -901,32 +908,32 @@ export const DailyBoardPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Operational Details / Countermeasure Context</label>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Operational Details / Countermeasure Context', 'Detaljer / Kontext för motåtgärd')}</label>
                   <textarea
                     rows={3}
                     disabled={readOnly}
                     value={editDetails}
                     onChange={(e) => setEditDetails(e.target.value)}
-                    placeholder="Add machine line, shift observations, or immediate containment steps..."
+                    placeholder={t('Add machine line, shift observations, or immediate containment steps...', 'Ange linje, skiftobservationer eller omedelbara åtgärder...')}
                     className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-xs text-[var(--ink)]"
                   />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Routing Path</label>
+                    <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Routing Path', 'Hanteringsspår')}</label>
                     <select
                       disabled={readOnly}
                       value={editRoute}
                       onChange={(e) => setEditRoute(e.target.value as PulseCard['routeType'])}
                       className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-2 text-xs text-[var(--ink)]"
                     >
-                      <option value="Direct fix">Direct fix</option>
+                      <option value="Direct fix">{t('Direct fix', 'Snabbåtgärd')}</option>
                       <option value="A3">A3</option>
-                      <option value="Escalate">Escalate</option>
+                      <option value="Escalate">{t('Escalate', 'Eskalera')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Due Date</label>
+                    <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Due Date', 'Slutdatum')}</label>
                     <input
                       type="date"
                       disabled={readOnly}
@@ -936,14 +943,14 @@ export const DailyBoardPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Linked KPI</label>
+                    <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Linked KPI', 'Kopplad KPI')}</label>
                     <select
                       disabled={readOnly}
                       value={editKpi}
                       onChange={(e) => setEditKpi(e.target.value)}
                       className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-2 text-xs text-[var(--ink)]"
                     >
-                      <option value="">None</option>
+                      <option value="">{t('None', 'Ingen')}</option>
                       {kpis.map((k) => (
                         <option key={k.id} value={k.id}>
                           {k.id} · {k.name}
@@ -967,7 +974,7 @@ export const DailyBoardPage: React.FC = () => {
                       }
                       className="rounded-lg bg-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
                     >
-                      Save Card Details
+                      {t('Save Card Details', 'Spara kortdetaljer')}
                     </button>
                   </div>
                 )}
@@ -977,7 +984,7 @@ export const DailyBoardPage: React.FC = () => {
               {(drawerCard.kpi || drawerCard.initiative || drawerCard.project || drawerCard.blockerId) && (
                 <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]/50 p-3.5 space-y-2">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                    Linked Strategy &amp; Escalation Chain
+                    {t('Linked Strategy & Escalation Chain', 'Kopplad strategi- & eskaleringskedja')}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {drawerCard.kpi && (
@@ -1001,7 +1008,7 @@ export const DailyBoardPage: React.FC = () => {
                         }}
                         className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 py-1 text-xs font-semibold hover:border-teal-500 cursor-pointer"
                       >
-                        Initiative {drawerCard.initiative} ↗
+                        {t('Initiative', 'Initiativ')} {drawerCard.initiative} ↗
                       </button>
                     )}
                     {drawerCard.project && (
@@ -1013,12 +1020,12 @@ export const DailyBoardPage: React.FC = () => {
                         }}
                         className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 py-1 text-xs font-semibold hover:border-teal-500 cursor-pointer"
                       >
-                        Project A3 {drawerCard.project} ↗
+                        {t('Project A3', 'Projekt-A3')} {drawerCard.project} ↗
                       </button>
                     )}
                     {drawerCard.blockerId && (
                       <span className="rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-800 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
-                        Blocker {drawerCard.blockerId}
+                        {t('Blocker', 'Hinder')} {drawerCard.blockerId}
                       </span>
                     )}
                   </div>
@@ -1029,11 +1036,11 @@ export const DailyBoardPage: React.FC = () => {
               <div className="space-y-3 border-t border-[var(--border)] pt-4">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--ink)]">
                   <MessageSquare className="w-3.5 h-3.5 text-teal-600" />
-                  <span>Stand-Up Notes &amp; Audit Log ({drawerCard.comments.length})</span>
+                  <span>{t('Stand-Up Notes & Audit Log', 'Anteckningar & händelselogg')} ({drawerCard.comments.length})</span>
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {drawerCard.comments.length === 0 ? (
-                    <p className="text-xs text-[var(--muted)]">No stand-up updates logged yet.</p>
+                    <p className="text-xs text-[var(--muted)]">{t('No stand-up updates logged yet.', 'Inga anteckningar loggade ännu.')}</p>
                   ) : (
                     drawerCard.comments.map((cm, idx) => (
                       <div key={idx} className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5 text-xs space-y-0.5">
@@ -1061,7 +1068,7 @@ export const DailyBoardPage: React.FC = () => {
                       type="text"
                       value={commentText}
                       onChange={(e) => setCommentText(e.target.value)}
-                      placeholder="Add stand-up handover note..."
+                      placeholder={t('Add stand-up handover note...', 'Skriv en överlämningsanteckning...')}
                       className="flex-1 rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-xs text-[var(--ink)]"
                     />
                     <button
@@ -1069,7 +1076,7 @@ export const DailyBoardPage: React.FC = () => {
                       className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
                     >
                       <Send className="w-3.5 h-3.5" />
-                      Post
+                      {t('Post', 'Skicka')}
                     </button>
                   </form>
                 )}

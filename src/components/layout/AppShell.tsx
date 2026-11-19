@@ -33,7 +33,8 @@ import {
   UserCog,
   X,
 } from 'lucide-react';
-import { AppRoute, SAFEQMS_ROLES, SafeQmsRole, formatRoleLabel } from '../../types/safeqms';
+import { AppRoute, SAFEQMS_ROLES, SafeQmsRole } from '../../types/safeqms';
+import { useLanguage } from '../../context/LanguageContext';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { useWalkthrough } from '../../context/WalkthroughContext';
 import {
@@ -57,42 +58,13 @@ interface NavItem {
 }
 
 interface NavSection {
+  id: string;
   title: string;
   items: NavItem[];
 }
 
-const ROUTE_TITLES: Record<AppRoute, string> = {
-  overview: 'Overview',
-  sop: 'SOP & User Guide',
-  onboarding: 'Ny kund · Starta från noll',
-  daily: 'Daily Management Board',
-  myfocus: 'Personal Obeya',
-  pillars: 'Strategic Pillars',
-  cascade: 'Goal Cascade',
-  matrix: 'Hoshin X-Matrix',
-  a3: 'Strategy A3',
-  goal: 'Strategic Goal',
-  newgoal: 'New Strategic Goal',
-  projects: 'Initiatives & Projects',
-  initiative: 'Initiative Detail',
-  newinitiative: 'New Initiative',
-  project: 'Project A3 & 5-Why',
-  kpis: 'KPIs & Bowling Chart',
-  import: 'CSV KPI Import',
-  catchball: 'Catchball Alignment',
-  catchballnew: 'New Catchball Thread',
-  catchballitem: 'Catchball Negotiation',
-  reviews: 'PDCA Reviews',
-  newreview: 'New PDCA Review',
-  review: 'PDCA Review Detail',
-  approvals: 'Formal Approvals',
-  iso: 'ISO Compliance Register',
-  evidence: 'Audit Evidence Pack',
-  management: 'Management Review Input',
-  settings: 'Team & Workspace Settings',
-};
-
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { lang, setLang, t, tRole, routeTitle } = useLanguage();
   const {
     authReady,
     user,
@@ -217,51 +189,57 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   const sections: NavSection[] = [
     {
-      title: 'Workspace',
+      id: 'Workspace',
+      title: t('Workspace', 'Arbetsyta'),
       items: [
-        { route: 'overview', label: 'Overview', icon: LayoutDashboard },
-        { route: 'sop', label: 'SOP & User Guide', icon: BookOpen },
-        { route: 'onboarding', label: 'Starta från noll', icon: Rocket },
+        { route: 'overview', label: t('Overview', 'Översikt'), icon: LayoutDashboard },
+        { route: 'sop', label: t('SOP & User Guide', 'SOP & Användarguide'), icon: BookOpen },
+        { route: 'onboarding', label: t('Start from Zero', 'Starta från noll'), icon: Rocket },
       ],
     },
     {
-      title: 'Daily Operations',
+      id: 'Daily Operations',
+      title: t('Daily Operations', 'Daglig drift'),
       items: [
-        { route: 'daily', label: 'Daily Board', icon: Kanban },
-        { route: 'myfocus', label: 'My Focus (Obeya)', icon: Compass },
+        { route: 'daily', label: t('Daily Board', 'Daily Board'), icon: Kanban },
+        { route: 'myfocus', label: t('My Focus (Obeya)', 'Mitt fokus (Obeya)'), icon: Compass },
       ],
     },
     {
-      title: 'Strategy Deployment',
+      id: 'Strategy Deployment',
+      title: t('Strategy Deployment', 'Strategisk styrning'),
       items: [
-        { route: 'pillars', label: 'Strategic Pillars', icon: Layers },
-        { route: 'cascade', label: 'Goal Cascade', icon: GitBranch },
+        { route: 'pillars', label: t('Strategic Pillars', 'Strategiska pelare'), icon: Layers },
+        { route: 'cascade', label: t('Goal Cascade', 'Målkaskad (Cascade)'), icon: GitBranch },
         { route: 'matrix', label: 'X-Matrix', icon: Grid3X3 },
-        { route: 'a3', label: 'Strategy A3', icon: Target },
+        { route: 'a3', label: t('Strategy A3', 'Strategi-A3'), icon: Target },
       ],
     },
     {
-      title: 'Execution & KPIs',
+      id: 'Execution & KPIs',
+      title: t('Execution & KPIs', 'Genomförande & KPI'),
       items: [
-        { route: 'projects', label: 'Initiatives & A3', icon: FolderKanban },
-        { route: 'kpis', label: 'KPIs & Bowling Chart', icon: BarChart3 },
-        { route: 'import', label: 'CSV KPI Import', icon: Upload, hidden: !canWriteKpi && isLimitedRole(activeRole) },
+        { route: 'projects', label: t('Initiatives & A3', 'Initiativ & A3'), icon: FolderKanban },
+        { route: 'kpis', label: t('KPIs & Bowling Chart', 'KPI:er & Bowling Chart'), icon: BarChart3 },
+        { route: 'import', label: t('CSV KPI Import', 'CSV-import av KPI'), icon: Upload, hidden: !canWriteKpi && isLimitedRole(activeRole) },
       ],
     },
     {
-      title: 'Governance',
+      id: 'Governance',
+      title: t('Governance', 'Styrning & Beslut'),
       items: [
-        { route: 'catchball', label: 'Catchball Alignment', icon: MessageSquareMore, hidden: isBasic },
-        { route: 'reviews', label: 'PDCA Reviews', icon: RefreshCw },
-        { route: 'approvals', label: 'Formal Approvals', icon: CheckCircle2, hidden: isBasic },
+        { route: 'catchball', label: t('Catchball Alignment', 'Catchball-förankring'), icon: MessageSquareMore, hidden: isBasic },
+        { route: 'reviews', label: t('PDCA Reviews', 'PDCA-genomgångar'), icon: RefreshCw },
+        { route: 'approvals', label: t('Formal Approvals', 'Formella godkännanden'), icon: CheckCircle2, hidden: isBasic },
       ],
     },
     {
-      title: 'ISO Assurance',
+      id: 'ISO Assurance',
+      title: t('ISO Assurance', 'ISO & Revision'),
       items: [
-        { route: 'iso', label: 'ISO Compliance', icon: Award, hidden: isBasic },
-        { route: 'evidence', label: 'Audit Evidence Pack', icon: ClipboardCheck, hidden: isBasic },
-        { route: 'management', label: 'Management Review', icon: FileSpreadsheet, hidden: isBasic },
+        { route: 'iso', label: t('ISO Compliance', 'ISO-efterlevnad'), icon: Award, hidden: isBasic },
+        { route: 'evidence', label: t('Audit Evidence Pack', 'Revisionsbevis (Audit)'), icon: ClipboardCheck, hidden: isBasic },
+        { route: 'management', label: t('Management Review', 'Ledningens genomgång'), icon: FileSpreadsheet, hidden: isBasic },
       ],
     },
   ];
@@ -282,7 +260,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         if (!item.hidden) {
           list.push({
             key: `nav-${item.route}`,
-            category: 'View',
+            category: t('View', 'Vy'),
             label: item.label,
             meta: sec.title,
             route: item.route,
@@ -293,8 +271,8 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     if (isActualAdmin) {
       list.push({
         key: 'nav-settings',
-        category: 'View',
-        label: 'Team & Workspace Settings',
+        category: t('View', 'Vy'),
+        label: t('Team & Workspace Settings', 'Team & Arbetsyteinställningar'),
         meta: 'Administration',
         route: 'settings',
       });
@@ -304,7 +282,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       if (visibleToRole(g, activeRole)) {
         list.push({
           key: `goal-${g.id}`,
-          category: 'Goal',
+          category: t('Goal', 'Mål'),
           code: g.id,
           label: g.title,
           meta: `${g.level} · ${g.owner}`,
@@ -320,7 +298,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         category: 'KPI',
         code: k.id,
         label: k.name,
-        meta: `Unit: ${k.unit}`,
+        meta: `${t('Unit', 'Enhet')}: ${k.unit}`,
         route: 'kpis',
         id: k.id,
       });
@@ -330,7 +308,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       if (visibleInitiative(i, goals, activeRole)) {
         list.push({
           key: `init-${i.id}`,
-          category: 'Initiative',
+          category: t('Initiative', 'Initiativ'),
           code: i.id,
           label: i.title,
           meta: `${i.owner} · ${i.progress}%`,
@@ -344,7 +322,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       if (visibleProject(p, initiatives, goals, activeRole)) {
         list.push({
           key: `proj-${p.id}`,
-          category: 'Project A3',
+          category: t('Project A3', 'Projekt-A3'),
           code: p.id,
           label: p.title,
           meta: `${p.initiative} · ${p.owner}`,
@@ -360,7 +338,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           key: `cb-${c.id}`,
           category: 'Catchball',
           code: c.id,
-          label: `Goal ${c.goal} · Target ${c.proposal.target}`,
+          label: `${t('Goal', 'Mål')} ${c.goal} · ${t('Target', 'Målvärde')} ${c.proposal.target}`,
           meta: c.status,
           route: 'catchballitem',
           id: c.id,
@@ -369,7 +347,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     }
 
     return list;
-  }, [activeRole, isActualAdmin, canWriteKpi, isBasic, goals, kpis, initiatives, projects, catchballs]);
+  }, [activeRole, isActualAdmin, canWriteKpi, isBasic, goals, kpis, initiatives, projects, catchballs, lang]);
 
   const filteredQuickResults = useMemo(() => {
     const q = quickSearchQuery.trim().toLowerCase();
@@ -409,15 +387,15 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           <div className="space-y-2.5 border-y border-[var(--border)] py-4 text-xs text-[var(--muted)]">
             <div className="flex items-center gap-2.5 text-[var(--ink)] font-medium">
               <Grid3X3 className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0" />
-              <span>360° Interactive Hoshin X-Matrix &amp; Goal Cascade</span>
+              <span>{t('360° Interactive Hoshin X-Matrix & Goal Cascade', '360° Interaktiv Hoshin X-Matrix & Målkaskad')}</span>
             </div>
             <div className="flex items-center gap-2.5 text-[var(--ink)] font-medium">
               <Kanban className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0" />
-              <span>Tier 1–3 Daily Management, Safety Cross &amp; Escalation</span>
+              <span>{t('Tier 1–3 Daily Management, Safety Cross & Escalation', 'Daglig styrning Nivå 1–3, Safety Cross & Eskalering')}</span>
             </div>
             <div className="flex items-center gap-2.5 text-[var(--ink)] font-medium">
               <FileCheck2 className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0" />
-              <span>Project A3 + 5-Why Builder &amp; ISO 9001/14001/45001 Evidence</span>
+              <span>{t('Project A3 + 5-Why Builder & ISO 9001/14001/45001 Evidence', 'Projekt-A3 + 5-Why & ISO 9001/14001/45001 Revisionsbevis')}</span>
             </div>
           </div>
 
@@ -426,11 +404,11 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             onClick={signInWithGoogle}
             className="w-full flex items-center justify-center gap-2.5 rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
           >
-            <span>Sign in with Google</span>
+            <span>{t('Sign in with Google', 'Logga in med Google')}</span>
           </button>
 
           <p className="text-[11px] text-center text-[var(--muted)]">
-            Shared team workspaces sync in real time via Firebase Firestore.
+            {t('Shared team workspaces sync in real time via Firebase Firestore.', 'Delade arbetsytor synkas i realtid via Firebase Firestore.')}
           </p>
         </div>
         <ToastHost />
@@ -464,7 +442,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       {!collapsed && workspaces.length > 1 && (
         <div className="px-2 pb-2">
           <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)] mb-1">
-            Active Workspace
+            {t('Active Workspace', 'Aktiv arbetsyta')}
           </label>
           <select
             value={activeWorkspace?.id || ''}
@@ -484,17 +462,17 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         .map((sec) => ({ ...sec, visibleItems: sec.items.filter((i) => !i.hidden) }))
         .filter((sec) => sec.visibleItems.length > 0)
         .map((sec, secIdx) => {
-          const isOpen = !!openSections[sec.title];
+          const isOpen = !!openSections[sec.id];
           const hasActiveItem = sec.visibleItems.some((item) => isNavItemActive(item.route));
           const showItems = collapsed || isOpen;
 
           return (
-            <div key={sec.title} className={collapsed ? 'space-y-1' : 'space-y-1'}>
+            <div key={sec.id} className={collapsed ? 'space-y-1' : 'space-y-1'}>
               {!collapsed ? (
                 <button
                   type="button"
                   aria-expanded={isOpen}
-                  onClick={() => toggleSection(sec.title)}
+                  onClick={() => toggleSection(sec.id)}
                   className={`w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${
                     hasActiveItem && !isOpen
                       ? 'text-teal-700 bg-teal-600/8 dark:text-teal-300 dark:bg-teal-400/10'
@@ -596,11 +574,11 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         {/* Center: Active Page Title */}
         <div className="hidden md:flex items-center justify-center min-w-0">
           <span className="text-[13px] font-semibold tracking-tight text-[var(--ink)] truncate">
-            {ROUTE_TITLES[route] || route}
+            {routeTitle(route)}
           </span>
         </div>
 
-        {/* Right: Quick Search, Primary Action, Theme & Account */}
+        {/* Right: Quick Search, Primary Action, Language Switcher, Theme & Account */}
         <div className="flex items-center gap-2 whitespace-nowrap shrink-0">
           <button
             type="button"
@@ -611,11 +589,11 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               setQuickSearchOpen(true);
             }}
             className="h-8 inline-flex items-center gap-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 text-xs text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] transition-colors cursor-pointer"
-            aria-label="Quick search"
-            title="Quick search (Ctrl+K / ⌘K)"
+            aria-label={t('Quick search', 'Snabbsök')}
+            title={t('Quick search (Ctrl+K / ⌘K)', 'Snabbsök (Ctrl+K / ⌘K)')}
           >
             <Search className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden md:inline">Search...</span>
+            <span className="hidden md:inline">{t('Search...', 'Sök...')}</span>
             <kbd className="hidden lg:inline font-mono text-[10px] text-[var(--muted)]">⌘K</kbd>
           </button>
           {canCreateGoal && (
@@ -625,15 +603,51 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               className="hidden sm:inline-flex h-8 items-center gap-1.5 rounded-lg bg-teal-700 px-3 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>New Goal</span>
+              <span>{t('New Goal', 'Nytt mål')}</span>
             </button>
           )}
+          <div
+            role="group"
+            aria-label={t('Interface language', 'Gränssnittsspråk')}
+            className="inline-flex h-8 items-center rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] p-0.5 text-[11px] font-bold"
+          >
+            <button
+              type="button"
+              onClick={() => setLang('sv')}
+              aria-pressed={lang === 'sv'}
+              title="Byt språk till svenska"
+              className={`h-full rounded-md px-2 transition-colors cursor-pointer ${
+                lang === 'sv'
+                  ? 'bg-teal-700 text-white dark:bg-teal-600'
+                  : 'text-[var(--muted)] hover:text-[var(--ink)]'
+              }`}
+            >
+              SV
+            </button>
+            <button
+              type="button"
+              onClick={() => setLang('en')}
+              aria-pressed={lang === 'en'}
+              title="Switch language to English"
+              className={`h-full rounded-md px-2 transition-colors cursor-pointer ${
+                lang === 'en'
+                  ? 'bg-teal-700 text-white dark:bg-teal-600'
+                  : 'text-[var(--muted)] hover:text-[var(--ink)]'
+              }`}
+            >
+              EN
+            </button>
+          </div>
           <button
             type="button"
             onClick={toggleTheme}
             className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] transition-colors cursor-pointer"
-            aria-label="Toggle color theme"
-            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-label={t('Toggle color theme', 'Växla färgtema')}
+            title={
+              theme === 'dark'
+                ? t('Switch to light theme', 'Byt till ljust tema')
+                : t('Switch to dark theme', 'Byt till mörkt tema')
+            }
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -644,7 +658,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               aria-expanded={userMenuOpen}
               aria-haspopup="menu"
               className="h-8 flex items-center gap-2 rounded-lg px-2 text-left hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer"
-              title="Account & Administration"
+              title={t('Account & Administration', 'Konto & Administration')}
             >
               <div className="w-6 h-6 rounded-md bg-teal-700/12 text-teal-800 ring-1 ring-inset ring-teal-700/20 dark:bg-teal-400/12 dark:text-teal-300 dark:ring-teal-400/20 flex items-center justify-center text-[11px] font-bold shrink-0">
                 {(user.displayName || user.email || 'U')
@@ -657,7 +671,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 <div className="font-semibold text-xs text-[var(--ink)] max-w-[130px] truncate">
                   {user.displayName || user.email}
                 </div>
-                <div className="text-[10px] text-[var(--muted)]">{formatRoleLabel(activeRole)}</div>
+                <div className="text-[10px] text-[var(--muted)]">{tRole(activeRole)}</div>
               </div>
               <ChevronDown
                 className={`w-3.5 h-3.5 text-[var(--muted)] transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
@@ -677,7 +691,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                     <div className="text-[11px] text-[var(--muted)] truncate">{user.email}</div>
                   )}
                   <div className="pt-1 flex items-center justify-between text-[10px] font-semibold text-teal-700 dark:text-teal-300">
-                    <span>{formatRoleLabel(actualRole)}</span>
+                    <span>{tRole(actualRole)}</span>
                     {activeWorkspace && (
                       <span className="text-[var(--muted)] font-normal truncate max-w-[120px]">
                         {activeWorkspace.name}
@@ -705,14 +719,14 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                       <div className="min-w-0">
                         <div>Administration</div>
                         <div className="text-[10px] font-normal text-[var(--muted)]">
-                          Team, roles &amp; workspace
+                          {t('Team, roles & workspace', 'Team, roller & arbetsyta')}
                         </div>
                       </div>
                     </button>
 
                     <div className="px-3.5 pt-2 pb-1 space-y-1">
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                        Role Preview
+                        {t('Role Preview', 'Förhandsgranska roll')}
                       </label>
                       <select
                         value={activeRole}
@@ -721,7 +735,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                       >
                         {SAFEQMS_ROLES.map((r) => (
                           <option key={r} value={r}>
-                            {formatRoleLabel(r)}
+                            {tRole(r)}
                           </option>
                         ))}
                       </select>
@@ -740,7 +754,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                     className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50/70 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                   >
                     <LogOut className="w-4 h-4 shrink-0" />
-                    <span>Sign out</span>
+                    <span>{t('Sign out', 'Logga ut')}</span>
                   </button>
                 </div>
               </div>
@@ -760,7 +774,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           {isActualAdmin && !sidebarCollapsed && (
             <div className="border-t border-[var(--border)] p-3.5 space-y-1.5">
               <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                Admin Role Preview
+                {t('Admin Role Preview', 'Förhandsgranska roll')}
               </label>
               <select
                 value={activeRole}
@@ -769,7 +783,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               >
                 {SAFEQMS_ROLES.map((r) => (
                   <option key={r} value={r}>
-                    {formatRoleLabel(r)}
+                    {tRole(r)}
                   </option>
                 ))}
               </select>
@@ -783,7 +797,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             <div className="fixed inset-0 bg-slate-950/60" onClick={() => setMobileOpen(false)} />
             <aside className="relative z-10 w-64 max-w-[85vw] bg-[var(--surface)] border-r border-[var(--border)] flex flex-col">
               <div className="h-14 px-4 flex items-center justify-between border-b border-[var(--border)]">
-                <span className="text-sm font-bold">SafeQMS Menu</span>
+                <span className="text-sm font-bold">{t('SafeQMS Menu', 'SafeQMS Meny')}</span>
                 <button
                   type="button"
                   onClick={() => setMobileOpen(false)}
@@ -808,7 +822,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 <Rocket className="w-4 h-4 shrink-0 text-teal-700 dark:text-teal-300" />
                 <div className="min-w-0">
                   <span className="font-bold">
-                    Guidad uppstart · Steg {onboardingBanner.step}/{onboardingBanner.total}: {onboardingBanner.title}
+                    {t('Guided Setup · Step', 'Guidad uppstart · Steg')} {onboardingBanner.step}/{onboardingBanner.total}: {onboardingBanner.title}
                   </span>
                   <span className="ml-2 text-[var(--ink)]/80 dark:text-teal-100/85">
                     {onboardingBanner.instruction}
@@ -821,12 +835,12 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                   onClick={() => navigate('onboarding', `step-${onboardingBanner.step}`)}
                   className="rounded-lg bg-teal-700 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
                 >
-                  ← Tillbaka till Steg {onboardingBanner.step}
+                  ← {t('Back to Step', 'Tillbaka till Steg')} {onboardingBanner.step}
                 </button>
                 <button
                   type="button"
                   onClick={() => setOnboardingBanner(null)}
-                  aria-label="Stäng uppstartsbanner"
+                  aria-label={t('Close setup banner', 'Stäng uppstartsbanner')}
                   className="rounded-md p-1 text-teal-900/70 hover:bg-teal-600/15 hover:text-teal-950 dark:text-teal-200/70 dark:hover:text-teal-100 cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -839,14 +853,15 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           {isActualAdmin && activeRole !== actualRole && (
             <div className="mx-4 sm:mx-6 mt-4 rounded-xl border border-amber-600/25 bg-amber-500/10 px-4 py-2 text-xs text-amber-900 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200 flex items-center justify-between gap-2 no-print">
               <span>
-                Previewing UI perspective as <strong>{formatRoleLabel(activeRole)}</strong> (Actual role: {formatRoleLabel(actualRole)}).
+                {t('Previewing UI perspective as', 'Förhandsgranskar gränssnittet som')}{' '}
+                <strong>{tRole(activeRole)}</strong> ({t('Actual role', 'Din roll')}: {tRole(actualRole)}).
               </span>
               <button
                 type="button"
                 onClick={() => setPreviewRole(actualRole)}
                 className="font-semibold underline hover:no-underline cursor-pointer"
               >
-                Reset to {formatRoleLabel(actualRole)}
+                {t('Reset to', 'Återställ till')} {tRole(actualRole)}
               </button>
             </div>
           )}
@@ -875,7 +890,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                         }}
                         className="font-semibold text-teal-700 dark:text-teal-300 hover:underline cursor-pointer"
                       >
-                        Open
+                        {t('Open', 'Öppna')}
                       </button>
                     )}
                     <button
@@ -883,7 +898,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                       onClick={() => markActivityRead(act.id)}
                       className="text-[var(--muted)] hover:text-[var(--ink)] cursor-pointer"
                     >
-                      Dismiss
+                      {t('Dismiss', 'Stäng')}
                     </button>
                   </div>
                 </div>
@@ -894,7 +909,8 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                   className="rounded-xl border border-teal-600/20 bg-teal-500/10 px-4 py-2 text-xs text-teal-900 dark:border-teal-400/20 dark:bg-teal-400/10 dark:text-teal-200 flex items-center justify-between gap-3"
                 >
                   <span>
-                    <strong>Director Log:</strong> New approval event recorded ({String(act.payload?.at || '')}).
+                    <strong>{t('Director Log', 'Ledningslogg')}:</strong>{' '}
+                    {t('New approval event recorded', 'Ny godkännandehändelse registrerad')} ({String(act.payload?.at || '')}).
                   </span>
                   <div className="flex items-center gap-2">
                     <button
@@ -905,14 +921,14 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                       }}
                       className="font-semibold hover:underline cursor-pointer"
                     >
-                      View Decisions
+                      {t('View Decisions', 'Visa beslut')}
                     </button>
                     <button
                       type="button"
                       onClick={() => markActivityRead(act.id)}
                       className="text-[var(--muted)] hover:text-[var(--ink)] cursor-pointer"
                     >
-                      Dismiss
+                      {t('Dismiss', 'Stäng')}
                     </button>
                   </div>
                 </div>
@@ -925,9 +941,14 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               <SkeletonView />
             ) : !activeWorkspace ? (
               <div className="rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] shadow-[var(--card-shadow)] p-6 max-w-lg mx-auto mt-8 space-y-3 text-center">
-                <h2 className="text-sm font-bold text-[var(--ink)]">Workspace initialization needed</h2>
+                <h2 className="text-sm font-bold text-[var(--ink)]">
+                  {t('Workspace initialization needed', 'Arbetsytan behöver initieras')}
+                </h2>
                 <p className="text-xs text-[var(--muted)]">
-                  Your SafeQMS workspace has not finished initializing yet. Click below to create or reload your shared workspace.
+                  {t(
+                    'Your SafeQMS workspace has not finished initializing yet. Click below to create or reload your shared workspace.',
+                    'Din SafeQMS-arbetsyta har inte initierats ännu. Klicka nedan för att skapa eller ladda din delade arbetsyta.'
+                  )}
                 </p>
                 <button
                   type="button"
@@ -935,7 +956,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                   className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  Initialize Workspace
+                  {t('Initialize Workspace', 'Initiera arbetsyta')}
                 </button>
               </div>
             ) : (
@@ -954,7 +975,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         >
           <div
             role="dialog"
-            aria-label="Quick search"
+            aria-label={t('Quick search', 'Snabbsök')}
             className="w-full max-w-xl rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] shadow-2xl overflow-hidden"
           >
             <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[var(--border)]">
@@ -992,14 +1013,17 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                     }
                   }
                 }}
-                placeholder="Jump to a view, goal (G-001), KPI (K-002), initiative, or A3..."
+                placeholder={t(
+                  'Jump to a view, goal (G-001), KPI (K-002), initiative, or A3...',
+                  'Hoppa till en vy, mål (G-001), KPI (K-002), initiativ eller A3...'
+                )}
                 className="flex-1 bg-transparent text-sm text-[var(--ink)] placeholder:text-[var(--muted)] focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => setQuickSearchOpen(false)}
                 className="rounded-md p-1 text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)] cursor-pointer"
-                aria-label="Close quick search"
+                aria-label={t('Close quick search', 'Stäng snabbsök')}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1008,7 +1032,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             <div className="max-h-80 overflow-y-auto py-1.5">
               {filteredQuickResults.length === 0 ? (
                 <div className="px-4 py-6 text-center text-xs text-[var(--muted)]">
-                  No matching views or workspace items found.
+                  {t('No matching views or workspace items found.', 'Inga matchande vyer eller poster hittades.')}
                 </div>
               ) : (
                 filteredQuickResults.map((item, idx) => {
@@ -1047,8 +1071,8 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             </div>
 
             <div className="px-4 py-2 border-t border-[var(--border)] bg-[var(--surface-subtle)]/50 flex items-center justify-between text-[11px] text-[var(--muted)]">
-              <span>↑↓ Navigate · Enter Open</span>
-              <span>Esc Close</span>
+              <span>{t('↑↓ Navigate · Enter Open', '↑↓ Navigera · Enter Öppna')}</span>
+              <span>{t('Esc Close', 'Esc Stäng')}</span>
             </div>
           </div>
         </div>

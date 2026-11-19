@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Printer, Table2 } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import {
   computeKpiStatus,
@@ -23,6 +24,7 @@ type Selection =
   | { kind: 'cell'; sector: 'tl' | 'tr' | 'bl' | 'br'; from: string; to: string };
 
 export const XMatrixPage: React.FC = () => {
+  const { t, tScope } = useLanguage();
   const {
     scope,
     year,
@@ -99,7 +101,10 @@ export const XMatrixPage: React.FC = () => {
     <div className="space-y-6">
       <SectionHeader
         title="Hoshin Kanri 360° X-Matrix"
-        subtitle="Connect Multi-Year Pillars (Bottom) → Annual Goals (Left) → Initiatives (Top) → KPIs (Right) → Cross-Functional Owners (SE Wing)."
+        subtitle={t(
+          'Connect Multi-Year Pillars (Bottom) → Annual Goals (Left) → Initiatives (Top) → KPIs (Right) → Cross-Functional Owners (SE Wing).',
+          'Koppla fleråriga pelare (Nederst) → Årsmål (Vänster) → Initiativ (Överst) → KPI:er (Höger) → Tvärfunktionella ägare (Sydost).'
+        )}
         actions={
           <div className="flex flex-wrap items-center gap-2 no-print">
             <label className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold cursor-pointer">
@@ -108,7 +113,7 @@ export const XMatrixPage: React.FC = () => {
                 checked={strongOnly}
                 onChange={(e) => setStrongOnly(e.target.checked)}
               />
-              Strong / Primary Only
+              {t('Strong / Primary Only', 'Endast starka / primära')}
             </label>
             <button
               type="button"
@@ -116,7 +121,7 @@ export const XMatrixPage: React.FC = () => {
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--surface-subtle)] cursor-pointer"
             >
               <Table2 className="w-3.5 h-3.5" />
-              {showTables ? 'Hide Tables' : 'Relationship Tables'}
+              {showTables ? t('Hide Tables', 'Dölj tabeller') : t('Relationship Tables', 'Relationstabeller')}
             </button>
             <button
               type="button"
@@ -124,7 +129,7 @@ export const XMatrixPage: React.FC = () => {
               className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
-              Print Matrix
+              {t('Print Matrix', 'Skriv ut matris')}
             </button>
           </div>
         }
@@ -138,7 +143,7 @@ export const XMatrixPage: React.FC = () => {
               onClick={() => setSelection({ kind: 'none' })}
               className="text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline cursor-pointer"
             >
-              Clear X-Matrix Highlight
+              {t('Clear X-Matrix Highlight', 'Rensa markering')}
             </button>
           )
         }
@@ -216,7 +221,7 @@ export const XMatrixPage: React.FC = () => {
           {/* Top-right Legend */}
           <div className="xm3-legendpanel text-[11px]">
             <div className="flex items-center gap-1.5 font-bold text-[var(--ink)] mb-1">
-              <span>Matrix Legend</span>
+              <span>{t('Matrix Legend', 'Teckenförklaring')}</span>
               <HelpTip
                 title="Så läser och redigerar du X-Matrix"
                 body="Klicka på valfri nod eller cell för att lysa upp hela kedjan av mål, initiativ, KPI:er och ägare. Behöriga roller kan dubbelklicka på en cell (eller ändra i sidopanelen) för att växla mellan ● Strong, ◐ Medium, ○ Weak och – Ingen relation."
@@ -225,11 +230,11 @@ export const XMatrixPage: React.FC = () => {
                 align="right"
               />
             </div>
-            <div className="flex items-center gap-2"><span className="xm3-dot strong" /> <span>Strong / Primary Owner (●)</span></div>
-            <div className="flex items-center gap-2"><span className="xm3-dot medium" /> <span>Medium / Support (◐)</span></div>
-            <div className="flex items-center gap-2"><span className="xm3-dot weak" /> <span>Weak link (○)</span></div>
-            <div className="flex items-center gap-2"><span className="xm3-dot blue strong" /> <span>Hierarchy parent (SW)</span></div>
-            <div className="flex items-center gap-2"><span className="xm3-dot owner strong" /> <span>SE Cross-Functional Owner</span></div>
+            <div className="flex items-center gap-2"><span className="xm3-dot strong" /> <span>{t('Strong / Primary Owner (●)', 'Stark / Primär ägare (●)')}</span></div>
+            <div className="flex items-center gap-2"><span className="xm3-dot medium" /> <span>{t('Medium / Support (◐)', 'Medel / Stöd (◐)')}</span></div>
+            <div className="flex items-center gap-2"><span className="xm3-dot weak" /> <span>{t('Weak link (○)', 'Svag koppling (○)')}</span></div>
+            <div className="flex items-center gap-2"><span className="xm3-dot blue strong" /> <span>{t('Hierarchy parent (SW)', 'Hierarkiskt föräldramål (SW)')}</span></div>
+            <div className="flex items-center gap-2"><span className="xm3-dot owner strong" /> <span>{t('SE Cross-Functional Owner', 'SE Tvärfunktionell ägare')}</span></div>
           </div>
 
           {/* W: Annual Goals Axis */}
@@ -249,13 +254,13 @@ export const XMatrixPage: React.FC = () => {
 
           {/* Core Compass */}
           <div className="xm3-core">
-            <div className="xm3-quadrant xm3-qtop"><span>Initiatives (How)</span></div>
-            <div className="xm3-quadrant xm3-qleft"><span>Annual Goals</span></div>
-            <div className="xm3-quadrant xm3-qright"><span>KPIs (Metrics)</span></div>
-            <div className="xm3-quadrant xm3-qbottom"><span>Breakthrough Pillars</span></div>
+            <div className="xm3-quadrant xm3-qtop"><span>{t('Initiatives (How)', 'Initiativ (Hur)')}</span></div>
+            <div className="xm3-quadrant xm3-qleft"><span>{t('Annual Goals', 'Årsmål')}</span></div>
+            <div className="xm3-quadrant xm3-qright"><span>{t('KPIs (Metrics)', 'KPI:er (Mätetal)')}</span></div>
+            <div className="xm3-quadrant xm3-qbottom"><span>{t('Breakthrough Pillars', 'Strategiska pelare')}</span></div>
             <div className="xm3-inner">
               <div className="text-[10px] font-mono font-bold uppercase text-teal-600 dark:text-teal-400">Hoshin 360°</div>
-              <div className="text-xs font-bold leading-tight mt-0.5">{scope}</div>
+              <div className="text-xs font-bold leading-tight mt-0.5">{tScope(scope)}</div>
               <div className="text-[11px] text-[var(--muted)] tabular-nums">{year}</div>
             </div>
           </div>
@@ -283,8 +288,8 @@ export const XMatrixPage: React.FC = () => {
 
           {/* SE Header */}
           <div className="xm3-ownerwinghead">
-            <div className="text-xs font-bold text-[var(--owner)]">Cross-Functional Ownership</div>
-            <div className="text-[11px] text-[var(--muted)]">Accountable KPI Leaders &amp; Support</div>
+            <div className="text-xs font-bold text-[var(--owner)]">{t('Cross-Functional Ownership', 'Tvärfunktionellt ägarskap')}</div>
+            <div className="text-[11px] text-[var(--muted)]">{t('Accountable KPI Leaders & Support', 'Ansvariga KPI-ledare & stöd')}</div>
           </div>
 
           {/* SW: Annual Goals x Multi-Year Pillars */}
@@ -371,7 +376,11 @@ export const XMatrixPage: React.FC = () => {
       <Card className="p-5 space-y-3">
         {selection.kind === 'none' && (
           <div className="text-xs text-[var(--muted)]">
-            <strong className="text-[var(--ink)]">Interactive Inspector:</strong> Click any Goal, Initiative, KPI, Pillar, Owner, or matrix intersection cell to trace causality and set connection strength in one click (or double-click any NW, NE, or SE cell to cycle).
+            <strong className="text-[var(--ink)]">{t('Interactive Inspector:', 'Interaktiv inspektör:')}</strong>{' '}
+            {t(
+              'Click any Goal, Initiative, KPI, Pillar, Owner, or matrix intersection cell to trace causality and set connection strength in one click (or double-click any NW, NE, or SE cell to cycle).',
+              'Klicka på valfritt mål, initiativ, KPI, pelare, ägare eller matrisruta för att spåra samband och sätta relationsstyrka med ett klick (eller dubbelklicka på NW-, NE- eller SE-rutor).'
+            )}
           </div>
         )}
 
@@ -379,7 +388,7 @@ export const XMatrixPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-xs font-mono font-bold uppercase text-teal-600 dark:text-teal-400">
-                Highlighted {selection.type} · {selection.id}
+                {t('Highlighted', 'Markerad')} {selection.type} · {selection.id}
               </div>
               <div className="text-sm font-bold text-[var(--ink)] mt-0.5">
                 {selection.type === 'corp' || selection.type === 'annual'
@@ -392,7 +401,7 @@ export const XMatrixPage: React.FC = () => {
               </div>
               {activeInfluence && (
                 <div className="text-xs text-[var(--muted)] mt-1">
-                  Trace: {activeInfluence.corp.size} pillars · {activeInfluence.annual.size} goals · {activeInfluence.initiative.size} initiatives · {activeInfluence.kpi.size} KPIs · {activeInfluence.owner.size} owners
+                  {t('Trace:', 'Kedja:')} {activeInfluence.corp.size} {t('pillars', 'pelare')} · {activeInfluence.annual.size} {t('goals', 'mål')} · {activeInfluence.initiative.size} {t('initiatives', 'initiativ')} · {activeInfluence.kpi.size} KPI · {activeInfluence.owner.size} {t('owners', 'ägare')}
                 </div>
               )}
             </div>
@@ -403,7 +412,7 @@ export const XMatrixPage: React.FC = () => {
                   onClick={() => navigate('goal', selection.id)}
                   className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
                 >
-                  Open Goal ↗
+                  {t('Open Goal ↗', 'Öppna mål ↗')}
                 </button>
               )}
               {selection.type === 'initiative' && (
@@ -412,7 +421,7 @@ export const XMatrixPage: React.FC = () => {
                   onClick={() => navigate('initiative', selection.id)}
                   className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
                 >
-                  Open Initiative ↗
+                  {t('Open Initiative ↗', 'Öppna initiativ ↗')}
                 </button>
               )}
               {selection.type === 'kpi' && (
@@ -421,7 +430,7 @@ export const XMatrixPage: React.FC = () => {
                   onClick={() => navigate('kpis', selection.id)}
                   className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
                 >
-                  Open KPI Chart ↗
+                  {t('Open KPI Chart ↗', 'Öppna KPI-diagram ↗')}
                 </button>
               )}
             </div>
@@ -450,23 +459,23 @@ export const XMatrixPage: React.FC = () => {
                 </div>
                 {isHierarchySector ? (
                   <div className="text-xs text-[var(--ink)]">
-                    Hierarchical parent-child cascade link (
+                    {t('Hierarchical parent-child cascade link', 'Hierarkisk kaskadkoppling')} (
                     {xm4HierarchyStrength(goals, selection.from, selection.to) === 2
-                      ? 'Direct parent'
+                      ? t('Direct parent', 'Direkt överordnat mål')
                       : xm4HierarchyStrength(goals, selection.from, selection.to) === 1
-                        ? 'Organization root ancestor'
-                        : 'No hierarchy link'}
-                    ). Manage parent in Goal detail.
+                        ? t('Organization root ancestor', 'Övergripande organisationsmål')
+                        : t('No hierarchy link', 'Ingen hierarkikoppling')}
+                    ). {t('Manage parent in Goal detail.', 'Hantera överordnat mål i måldetaljen.')}
                   </div>
                 ) : isOwnerSector ? (
                   <div className="text-xs text-[var(--ink)]">
-                    Accountability level:{' '}
+                    {t('Accountability level:', 'Ansvarsnivå:')}{' '}
                     <strong>
                       {currentOwnerStrength === 2
-                        ? 'Primary Owner'
+                        ? t('Primary Owner', 'Primär ägare')
                         : currentOwnerStrength === 1
-                          ? 'Cross-Functional Support'
-                          : 'Unassigned'}
+                          ? t('Cross-Functional Support', 'Tvärfunktionellt stöd')
+                          : t('Unassigned', 'Ej tilldelad')}
                     </strong>
                     {existingOwnerLink?.note && (
                       <span className="text-[var(--muted)]"> — {existingOwnerLink.note}</span>
@@ -474,15 +483,15 @@ export const XMatrixPage: React.FC = () => {
                   </div>
                 ) : (
                   <div className="text-xs text-[var(--ink)]">
-                    Relationship strength:{' '}
+                    {t('Relationship strength:', 'Relationsstyrka:')}{' '}
                     <strong>
                       {currentRelStrength === 2
-                        ? 'Strong'
+                        ? t('Strong', 'Stark')
                         : currentRelStrength === 1
-                          ? 'Medium'
+                          ? t('Medium', 'Medel')
                           : currentRelStrength === 0.5
-                            ? 'Weak'
-                            : 'None'}
+                            ? t('Weak', 'Svag')
+                            : t('None', 'Ingen')}
                     </strong>
                     {existingRelLink?.note && (
                       <span className="text-[var(--muted)]"> — {existingRelLink.note}</span>
@@ -499,9 +508,9 @@ export const XMatrixPage: React.FC = () => {
                         <div className="inline-flex rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] p-0.5">
                           {(
                             [
-                              { value: 0, label: 'Unassigned' },
-                              { value: 1, label: 'Support ◐' },
-                              { value: 2, label: 'Primary ●' },
+                              { value: 0, label: t('Unassigned', 'Ingen') },
+                              { value: 1, label: t('Support ◐', 'Stöd ◐') },
+                              { value: 2, label: t('Primary ●', 'Primär ●') },
                             ] as const
                           ).map((opt) => (
                             <button
@@ -523,7 +532,7 @@ export const XMatrixPage: React.FC = () => {
                           onClick={() => editKpiOwnerNote(selection.from, selection.to)}
                           className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--surface-subtle)] cursor-pointer"
                         >
-                          {existingOwnerLink?.note ? 'Edit Note' : 'Add Note'}
+                          {existingOwnerLink?.note ? t('Edit Note', 'Redigera anteckning') : t('Add Note', 'Lägg till anteckning')}
                         </button>
                       </>
                     )
@@ -533,10 +542,10 @@ export const XMatrixPage: React.FC = () => {
                         <div className="inline-flex rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] p-0.5">
                           {(
                             [
-                              { value: 0, label: 'None' },
-                              { value: 0.5, label: 'Weak ○' },
-                              { value: 1, label: 'Medium ◐' },
-                              { value: 2, label: 'Strong ●' },
+                              { value: 0, label: t('None', 'Ingen') },
+                              { value: 0.5, label: t('Weak ○', 'Svag ○') },
+                              { value: 1, label: t('Medium ◐', 'Medel ◐') },
+                              { value: 2, label: t('Strong ●', 'Stark ●') },
                             ] as const
                           ).map((opt) => (
                             <button
@@ -558,7 +567,7 @@ export const XMatrixPage: React.FC = () => {
                           onClick={() => editMatrixNote(selection.from, selection.to)}
                           className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--surface-subtle)] cursor-pointer"
                         >
-                          {existingRelLink?.note ? 'Edit Rationale' : 'Add Rationale'}
+                          {existingRelLink?.note ? t('Edit Rationale', 'Redigera motivering') : t('Add Rationale', 'Lägg till motivering')}
                         </button>
                       </>
                     )
@@ -574,16 +583,18 @@ export const XMatrixPage: React.FC = () => {
       {showTables && (
         <Card className="overflow-hidden">
           <div className="px-5 py-3.5 border-b border-[var(--border)]">
-            <h3 className="text-sm font-bold text-[var(--ink)]">Active Matrix Relationships ({relations.length})</h3>
+            <h3 className="text-sm font-bold text-[var(--ink)]">
+              {t('Active Matrix Relationships', 'Aktiva matrisrelationer')} ({relations.length})
+            </h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-[var(--surface-subtle)] text-[var(--muted)] border-b border-[var(--border)]">
                 <tr>
-                  <th className="px-4 py-2 font-semibold">From</th>
-                  <th className="px-4 py-2 font-semibold">To</th>
-                  <th className="px-4 py-2 font-semibold">Strength</th>
-                  <th className="px-4 py-2 font-semibold">Rationale</th>
+                  <th className="px-4 py-2 font-semibold">{t('From', 'Från')}</th>
+                  <th className="px-4 py-2 font-semibold">{t('To', 'Till')}</th>
+                  <th className="px-4 py-2 font-semibold">{t('Strength', 'Styrka')}</th>
+                  <th className="px-4 py-2 font-semibold">{t('Rationale', 'Motivering')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">

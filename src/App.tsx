@@ -1,4 +1,5 @@
 import React from 'react';
+import { LanguageProvider } from './context/LanguageContext';
 import { WorkspaceProvider, useWorkspace } from './context/WorkspaceContext';
 import { WalkthroughProvider } from './context/WalkthroughContext';
 import { WalkthroughOverlay } from './components/ui/WalkthroughOverlay';
@@ -97,13 +98,15 @@ const RouteView: React.FC = () => {
 
 export default function App() {
   return (
-    <WorkspaceProvider>
-      <WalkthroughProvider>
-        <AppShell>
-          <RouteView />
-        </AppShell>
-        <WalkthroughOverlay />
-      </WalkthroughProvider>
-    </WorkspaceProvider>
+    <LanguageProvider>
+      <WorkspaceProvider>
+        <WalkthroughProvider>
+          <AppShell>
+            <RouteView />
+          </AppShell>
+          <WalkthroughOverlay />
+        </WalkthroughProvider>
+      </WorkspaceProvider>
+    </LanguageProvider>
   );
 }

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { ALL_SCOPES, ASSIGNED_DEPARTMENT, StrategicGoal } from '../../types/safeqms';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   computeKpiStatus,
   goalById,
@@ -32,13 +33,17 @@ import { HelpTip } from '../ui/HelpTip';
 
 export const PillarsPage: React.FC = () => {
   const { goals, kpis, initiatives, relations, isoStandards, activeRole, scope, navigate } = useWorkspace();
+  const { t, tScope } = useLanguage();
   const orgGoals = goals.filter((g) => g.level === 'Organization' && visibleToRole(g, activeRole));
 
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Multi-Year Strategic Pillars (3–5 Years)"
-        subtitle="Top-level breakthrough objectives establishing direction for Sites, Departments, and Cross-Functional X-Matrix ownership."
+        title={t('Multi-Year Strategic Pillars (3–5 Years)', 'Fleråriga strategiska målpelare (3–5 år)')}
+        subtitle={t(
+          'Top-level breakthrough objectives establishing direction for Sites, Departments, and Cross-Functional X-Matrix ownership.',
+          'Övergripande genombrottsmål som sätter riktningen för anläggningar, avdelningar och tvärfunktionellt ägarskap i X-Matrix.'
+        )}
         actions={
           roleCan(activeRole, 'goalCreate', { level: 'Organization' }, { goals, initiatives }) && (
             <button
@@ -47,7 +52,7 @@ export const PillarsPage: React.FC = () => {
               className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              New Breakthrough Pillar
+              {t('New Breakthrough Pillar', 'Ny strategisk målpelare')}
             </button>
           )
         }
@@ -82,7 +87,7 @@ export const PillarsPage: React.FC = () => {
                   onClick={() => navigate('goal', pg.id)}
                   className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--surface-subtle)] cursor-pointer shrink-0"
                 >
-                  Open
+                  {t('Open', 'Öppna')}
                 </button>
               </div>
 
@@ -90,24 +95,25 @@ export const PillarsPage: React.FC = () => {
 
               <div className="grid grid-cols-3 gap-2 rounded-lg bg-[var(--surface-subtle)]/60 p-3 text-xs">
                 <div>
-                  <div className="text-[10px] text-[var(--muted)] uppercase font-bold">Owner</div>
+                  <div className="text-[10px] text-[var(--muted)] uppercase font-bold">{t('Owner', 'Ägare')}</div>
                   <div className="font-semibold text-[var(--ink)] truncate">{pg.owner}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-[var(--muted)] uppercase font-bold">KPI Pace</div>
+                  <div className="text-[10px] text-[var(--muted)] uppercase font-bold">{t('KPI Pace', 'KPI-takt')}</div>
                   <div className="font-mono font-bold tabular-nums text-[var(--ink)]">
                     {st.actual ?? '—'} / {pg.target} {pg.unit}
                   </div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-[var(--muted)] uppercase font-bold">ISO Links</div>
+                  <div className="text-[10px] text-[var(--muted)] uppercase font-bold">{t('ISO Links', 'ISO-krav')}</div>
                   <div className="font-semibold text-[var(--ink)] truncate">{isoShort(isoStandards, pg)}</div>
                 </div>
               </div>
 
               <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                  Annual Deployed Goals ({childGoals.length}) · {linkedInits.length} Initiatives ({scope})
+                  {t('Annual Deployed Goals', 'Nedbrutna årsmål')} ({childGoals.length}) · {linkedInits.length}{' '}
+                  {t('Initiatives', 'Initiativ')} ({tScope(scope)})
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {childGoals.map((cg) => (
@@ -133,6 +139,7 @@ export const PillarsPage: React.FC = () => {
 
 export const CascadePage: React.FC = () => {
   const { goals, kpis, initiatives, isoStandards, activeRole, scope, navigate } = useWorkspace();
+  const { t, tScope } = useLanguage();
   const [viewMode, setViewMode] = useState<'tree' | 'table'>('tree');
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
 
@@ -170,7 +177,7 @@ export const CascadePage: React.FC = () => {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="font-mono font-bold text-[var(--muted)]">{g.id}</span>
-                <span className="font-semibold text-teal-700 dark:text-teal-400">{g.level}</span>
+                <span className="font-semibold text-teal-700 dark:text-teal-400">{tScope(g.level)}</span>
                 <StatusBadge label={st.label} />
                 <StatusBadge label={g.approval} />
               </div>
@@ -193,7 +200,7 @@ export const CascadePage: React.FC = () => {
               onClick={() => navigate('goal', g.id)}
               className="rounded-lg border border-[var(--border-strong)] px-2.5 py-1 text-xs font-semibold hover:bg-[var(--surface-subtle)] cursor-pointer"
             >
-              Inspect / Edit
+              {t('Inspect / Edit', 'Granska / Redigera')}
             </button>
           </div>
         </div>
@@ -208,8 +215,11 @@ export const CascadePage: React.FC = () => {
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Goal Cascade Hierarchy"
-        subtitle="Multi-tier Hoshin deployment from Group Strategic Pillars to Sites and Functional Departments."
+        title={t('Goal Cascade Hierarchy', 'Målkaskad (Goal Cascade)')}
+        subtitle={t(
+          'Multi-tier Hoshin deployment from Group Strategic Pillars to Sites and Functional Departments.',
+          'Flernivånedbrytning enligt Hoshin Kanri från övergripande strategiska målpelare till anläggningar och avdelningar.'
+        )}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] p-0.5">
@@ -221,7 +231,7 @@ export const CascadePage: React.FC = () => {
                 }`}
               >
                 <GitBranch className="w-3.5 h-3.5" />
-                Tree
+                {t('Tree', 'Trädvy')}
               </button>
               <button
                 type="button"
@@ -230,7 +240,7 @@ export const CascadePage: React.FC = () => {
                   viewMode === 'table' ? 'bg-teal-600 text-white' : 'text-[var(--muted)]'
                 }`}
               >
-                Table
+                {t('Table', 'Tabell')}
               </button>
             </div>
             {roleCan(activeRole, 'goalCreate', null, { goals, initiatives }) && (
@@ -240,7 +250,7 @@ export const CascadePage: React.FC = () => {
                 className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                New Goal
+                {t('New Goal', 'Nytt mål')}
               </button>
             )}
           </div>
@@ -259,13 +269,13 @@ export const CascadePage: React.FC = () => {
               <thead className="bg-[var(--surface-subtle)] text-[var(--muted)] border-b border-[var(--border)]">
                 <tr>
                   <th className="px-4 py-2.5 font-semibold">ID</th>
-                  <th className="px-4 py-2.5 font-semibold">Goal</th>
-                  <th className="px-4 py-2.5 font-semibold">Level</th>
-                  <th className="px-4 py-2.5 font-semibold">Parent</th>
-                  <th className="px-4 py-2.5 font-semibold">Owner</th>
-                  <th className="px-4 py-2.5 font-semibold">Target</th>
-                  <th className="px-4 py-2.5 font-semibold">Approval</th>
-                  <th className="px-4 py-2.5 font-semibold">KPI Status</th>
+                  <th className="px-4 py-2.5 font-semibold">{t('Goal', 'Mål')}</th>
+                  <th className="px-4 py-2.5 font-semibold">{t('Level', 'Nivå')}</th>
+                  <th className="px-4 py-2.5 font-semibold">{t('Parent', 'Överordnat')}</th>
+                  <th className="px-4 py-2.5 font-semibold">{t('Owner', 'Ägare')}</th>
+                  <th className="px-4 py-2.5 font-semibold">{t('Target', 'Målvärde')}</th>
+                  <th className="px-4 py-2.5 font-semibold">{t('Approval', 'Godkännande')}</th>
+                  <th className="px-4 py-2.5 font-semibold">{t('KPI Status', 'KPI-status')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
@@ -277,8 +287,8 @@ export const CascadePage: React.FC = () => {
                   >
                     <td className="px-4 py-2.5 font-mono font-bold text-[var(--muted)]">{g.id}</td>
                     <td className="px-4 py-2.5 font-semibold text-[var(--ink)]">{g.title}</td>
-                    <td className="px-4 py-2.5">{g.level}</td>
-                    <td className="px-4 py-2.5 font-mono text-[var(--muted)]">{g.parent || 'Root'}</td>
+                    <td className="px-4 py-2.5">{tScope(g.level)}</td>
+                    <td className="px-4 py-2.5 font-mono text-[var(--muted)]">{g.parent || t('Root', 'Rotmål')}</td>
                     <td className="px-4 py-2.5">{g.owner}</td>
                     <td className="px-4 py-2.5 font-mono tabular-nums">
                       {g.target} {g.unit}
@@ -315,6 +325,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
     saveGoal,
     submitGoal,
   } = useWorkspace();
+  const { t, tScope, tStatus } = useLanguage();
 
   const existing = isNew ? undefined : goalById(goals, routeId);
   const canEdit = existing
@@ -421,9 +432,9 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
   if (!isNew && !existing) {
     return (
       <Card className="p-6 text-sm text-[var(--muted)]">
-        Goal not found.{' '}
+        {t('Goal not found.', 'Målet hittades inte.')}{' '}
         <button type="button" onClick={() => navigate('cascade')} className="text-teal-600 underline cursor-pointer">
-          Return to Goal Cascade
+          {t('Return to Goal Cascade', 'Tillbaka till målkaskaden')}
         </button>
       </Card>
     );
@@ -464,11 +475,14 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
   return (
     <div className="space-y-6">
       <SectionHeader
-        title={isNew ? 'Create Strategic Goal' : `${existing?.id} · ${existing?.title}`}
+        title={isNew ? t('Create Strategic Goal', 'Skapa strategiskt mål') : `${existing?.id} · ${existing?.title}`}
         subtitle={
           existing
-            ? `${existing.level} · Revision v${existing.revision} · Approval: ${existing.approval}`
-            : 'Define a Hoshin Kanri objective linked to an ISO clause, measurable KPI, and parent strategic goal.'
+            ? `${tScope(existing.level)} · ${t('Revision', 'Revision')} v${existing.revision} · ${t('Approval', 'Godkännande')}: ${tStatus(existing.approval)}`
+            : t(
+                'Define a Hoshin Kanri objective linked to an ISO clause, measurable KPI, and parent strategic goal.',
+                'Definiera ett Hoshin Kanri-mål kopplat till ISO-krav, mätbar KPI och överordnat strategiskt mål.'
+              )
         }
         actions={
           <div className="flex flex-wrap gap-2">
@@ -489,7 +503,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                 className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-sky-700 cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
-                Submit for Approval
+                {t('Submit for Approval', 'Skicka för godkännande')}
               </button>
             )}
           </div>
@@ -499,10 +513,10 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <form onSubmit={handleSave} className="xl:col-span-2 space-y-5">
           <Card className="p-5 space-y-4">
-            <h2 className="text-sm font-bold text-[var(--ink)]">Strategic Definition &amp; Hierarchy</h2>
+            <h2 className="text-sm font-bold text-[var(--ink)]">{t('Strategic Definition & Hierarchy', 'Strategisk definition & hierarki')}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Goal Title</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Goal Title', 'Måltitel')}</label>
                 <input
                   type="text"
                   required
@@ -513,7 +527,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Organizational Level</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Organizational Level', 'Organisationsnivå')}</label>
                 <select
                   disabled={!canEdit}
                   value={level}
@@ -527,14 +541,14 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                 >
                   {ALL_SCOPES.map((s) => (
                     <option key={s} value={s}>
-                      {s}
+                      {tScope(s)}
                     </option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--muted)] mb-1">
-                  <span>Primary Parent Goal</span>
+                  <span>{t('Primary Parent Goal', 'Överordnat mål')}</span>
                   <HelpTip
                     title="Målhierarki (Organization → Site → Department)"
                     body="Primary Parent Goal styr den vertikala spårbarheten i Goal Cascade. Organization-mål är rotmål utan förälder, Site-mål väljer ett Organization-mål, och Department-mål väljer ett Site-mål."
@@ -549,18 +563,18 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                   className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 text-xs text-[var(--ink)]"
                 >
                   {level === 'Organization' ? (
-                    <option value="">Root (Multi-Year Strategic Pillar)</option>
+                    <option value="">{t('Root (Multi-Year Strategic Pillar)', 'Rotmål (Flerårig strategisk målpelare)')}</option>
                   ) : (
                     validParents.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.id} · {p.title} ({p.level})
+                        {p.id} · {p.title} ({tScope(p.level)})
                       </option>
                     ))
                   )}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Accountable Owner</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Accountable Owner', 'Ansvarig ägare')}</label>
                 <input
                   type="text"
                   disabled={!canEdit}
@@ -570,7 +584,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Horizon / Year</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Horizon / Year', 'Horisont / År')}</label>
                 <input
                   type="text"
                   disabled={!canEdit}
@@ -583,7 +597,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2 border-t border-[var(--border)]">
               <div className="col-span-2 sm:col-span-1">
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Linked KPI</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Linked KPI', 'Kopplad KPI')}</label>
                 <select
                   disabled={!canEdit}
                   value={kpi}
@@ -602,7 +616,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Baseline</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Baseline', 'Nuläge (Baseline)')}</label>
                 <input
                   type="number"
                   step="any"
@@ -613,7 +627,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Target</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Target', 'Målvärde')}</label>
                 <input
                   type="number"
                   step="any"
@@ -624,7 +638,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Unit</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Unit', 'Enhet')}</label>
                 <input
                   type="text"
                   disabled={!canEdit}
@@ -639,7 +653,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
           {/* ISO 6.2 Planning Card */}
           <Card className="p-5 space-y-4">
             <div className="flex items-center gap-1.5">
-              <h2 className="text-sm font-bold text-[var(--ink)]">ISO 9001 / 14001 / 45001 Clause 6.2 Planning</h2>
+              <h2 className="text-sm font-bold text-[var(--ink)]">{t('ISO 9001 / 14001 / 45001 Clause 6.2 Planning', 'ISO 9001 / 14001 / 45001 Avsnitt 6.2 Planering')}</h2>
               <HelpTip
                 title="ISO 6.2 Planeringsfält"
                 body="Enligt ISO 9001/14001/45001 avsnitt 6.2 ska varje kvalitets-, miljö- och arbetsmiljömål dokumentera vad som ska göras, vilka resurser som krävs, vem som ansvarar, när det ska vara klart samt hur resultatet utvärderas."
@@ -649,7 +663,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Description / Intent</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Description / Intent', 'Beskrivning / Syfte')}</label>
                 <textarea
                   rows={2}
                   disabled={!canEdit}
@@ -659,7 +673,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">What will be done</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('What will be done', 'Vad som ska göras')}</label>
                 <textarea
                   rows={2}
                   disabled={!canEdit}
@@ -670,7 +684,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Resources Required</label>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Resources Required', 'Resurser som krävs')}</label>
                   <input
                     type="text"
                     disabled={!canEdit}
@@ -680,7 +694,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Target Completion Date</label>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Target Completion Date', 'Måldatum för färdigställande')}</label>
                   <input
                     type="date"
                     disabled={!canEdit}
@@ -691,7 +705,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">How results will be evaluated</label>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('How results will be evaluated', 'Hur resultatet ska utvärderas')}</label>
                 <input
                   type="text"
                   disabled={!canEdit}
@@ -702,7 +716,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Risk References</label>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Risk References', 'Riskreferenser')}</label>
                   <input
                     type="text"
                     disabled={!canEdit}
@@ -712,7 +726,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Process References</label>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Process References', 'Processreferenser')}</label>
                   <input
                     type="text"
                     disabled={!canEdit}
@@ -722,7 +736,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Evidence Doc Refs</label>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">{t('Evidence Doc Refs', 'Bevis- / dokumentreferenser')}</label>
                   <input
                     type="text"
                     disabled={!canEdit}
@@ -738,12 +752,12 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
           {/* ISO References Grid */}
           <Card className="p-5 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-bold text-[var(--ink)]">Linked ISO Standard Clauses ({isoRefs.length})</h2>
+              <h2 className="text-sm font-bold text-[var(--ink)]">{t('Linked ISO Standard Clauses', 'Kopplade ISO-krav')} ({isoRefs.length})</h2>
               <input
                 type="text"
                 value={isoSearch}
                 onChange={(e) => setIsoSearch(e.target.value)}
-                placeholder="Filter clauses..."
+                placeholder={t('Filter clauses...', 'Filtrera kravpunkter...')}
                 className="rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1 text-xs"
               />
             </div>
@@ -785,7 +799,9 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
                   className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
-                  {existing ? 'Save Changes (New Revision if Approved)' : 'Create Strategic Goal'}
+                  {existing
+                    ? t('Save Changes (New Revision if Approved)', 'Spara ändringar (ny revision om godkänt)')
+                    : t('Create Strategic Goal', 'Skapa strategiskt mål')}
                 </button>
               </div>
             )}
@@ -797,7 +813,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
           <Card className="p-5 space-y-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
-                <h2 className="text-sm font-bold text-[var(--ink)]">ISO Readiness Checklist</h2>
+                <h2 className="text-sm font-bold text-[var(--ink)]">{t('ISO Readiness Checklist', 'ISO-planeringschecklista')}</h2>
                 <HelpTip
                   title="ISO Ready ≠ Verifierad ISO-efterlevnad"
                   body="Checklistan kontrollerar att alla obligatoriska planeringsfält enligt avsnitt 6.2 är ifyllda (8 fält + överordnat mål för Site/Department)."
@@ -827,6 +843,7 @@ export const GoalFormPage: React.FC<{ isNew?: boolean }> = ({ isNew = false }) =
 
 export const StrategyA3Page: React.FC = () => {
   const { scope, year, goals, kpis, initiatives, relations, plans, isoStandards, activeRole, domainSnapshot, navigate } = useWorkspace();
+  const { t, tScope, tStatus } = useLanguage();
   const orgGoals = goals.filter((g) => g.level === 'Organization' && visibleToRole(g, activeRole));
   const annualGoals = roleVisibleGoals(goals, scope, activeRole).filter((g) => g.level !== 'Organization');
   const activePlan = plans.find((p) => p.scope === scope) || plans[0];
@@ -839,8 +856,8 @@ export const StrategyA3Page: React.FC = () => {
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="One-Page Strategy A3 Summary"
-        subtitle={`Printable Hoshin Kanri alignment sheet for ${scope} (${year}).`}
+        title={t('One-Page Strategy A3 Summary', 'Strategi-A3 · Ensidessammanfattning')}
+        subtitle={`${t('Printable Hoshin Kanri alignment sheet for', 'Utskrivbart Hoshin Kanri-blad för')} ${tScope(scope)} (${year}).`}
         actions={
           <button
             type="button"
@@ -848,7 +865,7 @@ export const StrategyA3Page: React.FC = () => {
             className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer no-print"
           >
             <Printer className="w-3.5 h-3.5" />
-            Print A3 Landscape
+            {t('Print A3 Landscape', 'Skriv ut A3 (liggande)')}
           </button>
         }
       />
@@ -859,19 +876,19 @@ export const StrategyA3Page: React.FC = () => {
         <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[var(--border)]">
           <div>
             <div className="text-[11px] font-mono font-bold uppercase text-teal-600 dark:text-teal-400">
-              SafeQMS Strategy A3 · {scope} · Horizon {year}
+              SafeQMS Strategy A3 · {tScope(scope)} · {t('Horizon', 'Horisont')} {year}
             </div>
-            <h2 className="text-lg font-bold text-[var(--ink)]">{activePlan?.name || 'Annual Strategy Alignment'}</h2>
+            <h2 className="text-lg font-bold text-[var(--ink)]">{activePlan?.name || t('Annual Strategy Alignment', 'Årlig strategiförankring')}</h2>
           </div>
           <div className="text-xs text-[var(--muted)]">
-            Owner: <strong className="text-[var(--ink)]">{activePlan?.owner || 'Executive Management'}</strong> · Rev v{activePlan?.revision || 1}
+            {t('Owner', 'Ägare')}: <strong className="text-[var(--ink)]">{activePlan?.owner || t('Executive Management', 'Ledningsgrupp')}</strong> · Rev v{activePlan?.revision || 1}
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="a3-box rounded-xl border border-[var(--border)] p-4 space-y-2.5">
             <div className="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
-              01 · Strategic Breakthrough Pillars
+              01 · {t('Strategic Breakthrough Pillars', 'Strategiska genombrottsmål')}
             </div>
             {orgGoals.map((g) => (
               <div key={g.id} className="text-xs border-b border-[var(--border)] pb-2 last:border-0 last:pb-0">
@@ -879,14 +896,16 @@ export const StrategyA3Page: React.FC = () => {
                   <span className="font-mono text-[var(--muted)] mr-1.5">{g.id}</span>
                   {g.title}
                 </div>
-                <div className="text-[11px] text-[var(--muted)]">{isoShort(isoStandards, g)} · Target {g.target} {g.unit}</div>
+                <div className="text-[11px] text-[var(--muted)]">
+                  {isoShort(isoStandards, g)} · {t('Target', 'Mål')} {g.target} {g.unit}
+                </div>
               </div>
             ))}
           </div>
 
           <div className="a3-box rounded-xl border border-[var(--border)] p-4 space-y-2.5">
             <div className="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
-              02 · Deployed Annual Objectives ({annualGoals.length})
+              02 · {t('Deployed Annual Objectives', 'Nedbrutna årsmål')} ({annualGoals.length})
             </div>
             {annualGoals.map((g) => {
               const st = computeKpiStatus(kpiById(kpis, g.kpi));
@@ -901,11 +920,11 @@ export const StrategyA3Page: React.FC = () => {
                       <span className="font-mono text-[var(--muted)] mr-1">{g.id}</span>
                       {g.title}
                     </button>
-                    <div className="text-[11px] text-[var(--muted)]">{g.level} · {g.owner}</div>
+                    <div className="text-[11px] text-[var(--muted)]">{tScope(g.level)} · {g.owner}</div>
                   </div>
                   <div className="text-right font-mono tabular-nums shrink-0">
                     <div className="font-bold">{st.actual ?? '—'} / {g.target} {g.unit}</div>
-                    <div className="text-[10px] text-[var(--muted)]">{st.label}</div>
+                    <div className="text-[10px] text-[var(--muted)]">{tStatus(st.label)}</div>
                   </div>
                 </div>
               );
@@ -914,7 +933,7 @@ export const StrategyA3Page: React.FC = () => {
 
           <div className="a3-box rounded-xl border border-[var(--border)] p-4 space-y-2.5">
             <div className="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
-              03 · Priority Initiatives &amp; Bottlenecks
+              03 · {t('Priority Initiatives & Bottlenecks', 'Prioriterade initiativ & flaskhalsar')}
             </div>
             {exceptions.map((i) => (
               <div key={i.id} className="flex items-center justify-between gap-2 text-xs border-b border-[var(--border)] pb-1.5 last:border-0">
@@ -923,7 +942,7 @@ export const StrategyA3Page: React.FC = () => {
                   <span className="font-semibold">{i.title}</span>
                 </div>
                 <span className="font-mono font-bold tabular-nums shrink-0">
-                  {i.progress}% · {i.status}
+                  {i.progress}% · {tStatus(i.status)}
                 </span>
               </div>
             ))}
@@ -931,15 +950,19 @@ export const StrategyA3Page: React.FC = () => {
 
           <div className="a3-box rounded-xl border border-[var(--border)] p-4 space-y-2.5">
             <div className="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
-              04 · PDCA Governance Cadence ({domainSnapshot.reviews.length} Reviews)
+              04 · {t('PDCA Governance Cadence', 'PDCA-styrningskadens')} ({domainSnapshot.reviews.length} {t('Reviews', 'genomgångar')})
             </div>
             <p className="text-xs text-[var(--muted)]">
-              Monthly Bowling Chart deviations trigger root-cause A3 analysis and Catchball resource calibration during Site &amp; Group PDCA Reviews.
+              {t(
+                'Monthly Bowling Chart deviations trigger root-cause A3 analysis and Catchball resource calibration during Site & Group PDCA Reviews.',
+                'Avvikelser i månatliga Bowling Charts triggar A3-rotårsaksanalys och resurskalibrering via Catchball vid anläggnings- och koncerngemensamma PDCA-genomgångar.'
+              )}
             </p>
             <div className="space-y-1.5">
               {domainSnapshot.reviews.map((r) => (
                 <div key={r.id} className="text-xs">
-                  <strong className="font-mono">{r.id}</strong> · {r.title} ({r.date}) · {r.decisions.filter((d) => d.status === 'Open').length} open actions
+                  <strong className="font-mono">{r.id}</strong> · {r.title} ({r.date}) ·{' '}
+                  {r.decisions.filter((d) => d.status === 'Open').length} {t('open actions', 'öppna beslut')}
                 </div>
               ))}
             </div>

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { ArrowUpRight, Compass } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import {
   computeKpiStatus,
@@ -13,6 +14,7 @@ import { Card, SectionHeader, SqdcStrip, StatusBadge } from '../ui/Badge';
 import { BlockerBox } from '../ui/BlockerPanel';
 
 export const MyFocusPage: React.FC = () => {
+  const { t, tScope } = useLanguage();
   const {
     activeRole,
     domainSnapshot,
@@ -55,8 +57,11 @@ export const MyFocusPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Personal Obeya · My Focus"
-        subtitle="Accountability cockpit linking X-Matrix KPIs, owned initiatives, daily pulse actions, and open PDCA exceptions."
+        title={t('Personal Obeya · My Focus', 'Personlig Obeya · Mitt fokus')}
+        subtitle={t(
+          'Accountability cockpit linking X-Matrix KPIs, owned initiatives, daily pulse actions, and open PDCA exceptions.',
+          'Ansvarscockpit som samlar dina X-Matrix-KPI:er, initiativ, dagliga pulskort och öppna PDCA-avvikelser.'
+        )}
         actions={
           <div data-tour="myfocus-header" className="flex items-center gap-2">
             <Compass className="w-4 h-4 text-teal-700 dark:text-teal-400" />
@@ -102,9 +107,9 @@ export const MyFocusPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* My Goals */}
         <Card className="p-5 space-y-3">
-          <h2 className="text-sm font-bold text-[var(--ink)]">Strategic Goals in Scope ({myGoals.length})</h2>
+          <h2 className="text-sm font-bold text-[var(--ink)]">{t('Strategic Goals in Scope', 'Strategiska mål i fokus')} ({myGoals.length})</h2>
           {myGoals.length === 0 ? (
-            <p className="text-xs text-[var(--muted)]">No goals directly owned by {currentOwner}.</p>
+            <p className="text-xs text-[var(--muted)]">{t('No goals directly owned by', 'Inga mål direkt ägda av')} {currentOwner}.</p>
           ) : (
             <div className="space-y-2">
               {myGoals.map((g) => (
@@ -119,7 +124,7 @@ export const MyFocusPage: React.FC = () => {
                       <span className="font-mono text-[var(--muted)] mr-1.5">{g.id}</span>
                       {g.title}
                     </div>
-                    <div className="text-[11px] text-[var(--muted)]">{g.level} · Target {g.target} {g.unit}</div>
+                    <div className="text-[11px] text-[var(--muted)]">{tScope(g.level)} · {t('Target', 'Mål')} {g.target} {g.unit}</div>
                   </div>
                   <StatusBadge label={g.performance} />
                 </button>
@@ -130,9 +135,9 @@ export const MyFocusPage: React.FC = () => {
 
         {/* My Initiatives & SQDC */}
         <Card className="p-5 space-y-3">
-          <h2 className="text-sm font-bold text-[var(--ink)]">Owned &amp; Supporting Initiatives ({myInits.length})</h2>
+          <h2 className="text-sm font-bold text-[var(--ink)]">{t('Owned & Supporting Initiatives', 'Egna & stödjande initiativ')} ({myInits.length})</h2>
           {myInits.length === 0 ? (
-            <p className="text-xs text-[var(--muted)]">No initiatives linked to {currentOwner}.</p>
+            <p className="text-xs text-[var(--muted)]">{t('No initiatives linked to', 'Inga initiativ kopplade till')} {currentOwner}.</p>
           ) : (
             <div className="space-y-2.5">
               {myInits.map((i) => (
@@ -162,7 +167,7 @@ export const MyFocusPage: React.FC = () => {
         {/* Open Daily Board Kanban Cards */}
         <Card className="p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-[var(--ink)]">Open Daily Pulse Cards ({myCards.length})</h2>
+            <h2 className="text-sm font-bold text-[var(--ink)]">{t('Open Daily Pulse Cards', 'Öppna pulskort i Daily Board')} ({myCards.length})</h2>
             <button
               type="button"
               onClick={() => navigate('daily')}
@@ -173,7 +178,7 @@ export const MyFocusPage: React.FC = () => {
             </button>
           </div>
           {myCards.length === 0 ? (
-            <p className="text-xs text-[var(--muted)]">No open Daily Board cards assigned.</p>
+            <p className="text-xs text-[var(--muted)]">{t('No open Daily Board cards assigned.', 'Inga öppna kort i Daily Board tilldelade.')}</p>
           ) : (
             <div className="space-y-2">
               {myCards.map((c) => (
@@ -184,7 +189,7 @@ export const MyFocusPage: React.FC = () => {
                       {c.title}
                     </div>
                     <div className="text-[11px] text-[var(--muted)]">
-                      {c.scope} · <StatusBadge label={c.status} />
+                      {tScope(c.scope)} · <StatusBadge label={c.status} />
                     </div>
                   </div>
                   {activeRole !== 'Auditor' && (
@@ -193,7 +198,7 @@ export const MyFocusPage: React.FC = () => {
                       onClick={() => togglePulseCardDone(c.id)}
                       className="rounded border border-[var(--border-strong)] px-2.5 py-1 text-[11px] font-semibold hover:bg-[var(--surface-subtle)] cursor-pointer shrink-0"
                     >
-                      ✓ Done
+                      {t('✓ Done', '✓ Klar')}
                     </button>
                   )}
                 </div>
@@ -204,33 +209,33 @@ export const MyFocusPage: React.FC = () => {
 
         {/* My Project Tasks */}
         <Card className="p-5 space-y-3">
-          <h2 className="text-sm font-bold text-[var(--ink)]">Project A3 Tasks ({myTasks.length})</h2>
+          <h2 className="text-sm font-bold text-[var(--ink)]">{t('Project A3 Tasks', 'Projekt-A3 uppgifter')} ({myTasks.length})</h2>
           {myTasks.length === 0 ? (
-            <p className="text-xs text-[var(--muted)]">No project tasks assigned directly to {currentOwner}.</p>
+            <p className="text-xs text-[var(--muted)]">{t('No project tasks assigned directly to', 'Inga projektuppgifter tilldelade direkt till')} {currentOwner}.</p>
           ) : (
             <div className="space-y-2">
-              {myTasks.map((t) => (
-                <div key={t.id} className="rounded-lg border border-[var(--border)] p-3 flex items-center justify-between gap-3">
+              {myTasks.map((tk) => (
+                <div key={tk.id} className="rounded-lg border border-[var(--border)] p-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-xs font-semibold text-[var(--ink)] truncate">{t.title}</div>
+                    <div className="text-xs font-semibold text-[var(--ink)] truncate">{tk.title}</div>
                     <div className="text-[11px] text-[var(--muted)]">
                       <button
                         type="button"
-                        onClick={() => navigate('project', t.project)}
+                        onClick={() => navigate('project', tk.project)}
                         className="font-mono text-teal-700 dark:text-teal-400 hover:underline mr-1.5 cursor-pointer"
                       >
-                        {t.project}
+                        {tk.project}
                       </button>
-                      Due {t.due || '—'}
+                      {t('Due', 'Förfaller')} {tk.due || '—'}
                     </div>
                   </div>
                   <button
                     type="button"
                     disabled={activeRole === 'Auditor'}
-                    onClick={() => toggleTaskStatus(t.id)}
+                    onClick={() => toggleTaskStatus(tk.id)}
                     className="cursor-pointer shrink-0"
                   >
-                    <StatusBadge label={t.status} />
+                    <StatusBadge label={tk.status} />
                   </button>
                 </div>
               ))}
@@ -241,7 +246,7 @@ export const MyFocusPage: React.FC = () => {
 
       {myExceptions.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-bold text-[var(--ink)]">Active Blockers &amp; Escalations</h2>
+          <h2 className="text-sm font-bold text-[var(--ink)]">{t('Active Blockers & Escalations', 'Aktiva hinder & eskaleringar')}</h2>
           <div className="space-y-3">
             {myExceptions.map((b) => (
               <BlockerBox key={b.id} blocker={b} />
