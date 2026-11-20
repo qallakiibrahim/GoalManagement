@@ -45,6 +45,9 @@ export const KpisPage: React.FC = () => {
   const [newKpiDirection, setNewKpiDirection] = useState<'higher' | 'lower'>('higher');
   const [newKpiTarget, setNewKpiTarget] = useState('75');
   const [newKpiTolerance, setNewKpiTolerance] = useState('2');
+  const [quickMonthIdx, setQuickMonthIdx] = useState<number>(() => new Date().getMonth());
+  const [quickActual, setQuickActual] = useState('');
+  const [quickSaving, setQuickSaving] = useState(false);
   const canCreateKpi = leadershipRole(activeRole);
 
   const handleCreateKpiSubmit = async (e: React.FormEvent) => {
@@ -366,6 +369,70 @@ export const KpisPage: React.FC = () => {
           </span>
         }
       />
+
+      {/* Inline Monthly Quick-Log Bar */}
+      {canWrite && (
+        <Card className="p-3.5">
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const trimmed = quickActual.trim();
+              if (!trimmed) return;
+              const num = Number(trimmed);
+              if (!Number.isFinite(num)) return;
+              setQuickSaving(true);
+              try {
+                await updateKpiMonth(
+                  activeKpi.id,
+                  quickMonthIdx,
+                  num,
+                  activeKpi.targets[quickMonthIdx] ?? null
+                );
+                setQuickActual('');
+              } finally {
+                setQuickSaving(false);
+              }
+            }}
+            className="flex flex-wrap items-center gap-2.5 text-xs"
+          >
+            <span className="font-semibold text-[var(--ink)] whitespace-nowrap">
+              {t('Quick Log Actual:', 'Snabblogga utfall:')}
+            </span>
+            <select
+              value={quickMonthIdx}
+              onChange={(e) => setQuickMonthIdx(Number(e.target.value))}
+              aria-label={t('Select month', 'Välj månad')}
+              className="rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)]"
+            >
+              {MONTHS.map((_, mIdx) => (
+                <option key={mIdx} value={mIdx}>
+                  {tMonth(mIdx)} 2027
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              step="any"
+              value={quickActual}
+              onChange={(e) => setQuickActual(e.target.value)}
+              placeholder={
+                activeKpi.values[quickMonthIdx] !== null && activeKpi.values[quickMonthIdx] !== undefined
+                  ? `${t('Current:', 'Nu:')} ${activeKpi.values[quickMonthIdx]}`
+                  : `${t('Target:', 'Mål:')} ${activeKpi.targets[quickMonthIdx] ?? '—'}`
+              }
+              className="w-36 rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 font-mono tabular-nums text-xs text-[var(--ink)]"
+            />
+            <span className="text-[var(--muted)] font-mono">{activeKpi.unit}</span>
+            <button
+              type="submit"
+              disabled={quickSaving || !quickActual.trim()}
+              className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-45 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              {quickSaving ? '...' : t('Save Actual', 'Spara utfall')}
+            </button>
+          </form>
+        </Card>
+      )}
 
       {/* 4 KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

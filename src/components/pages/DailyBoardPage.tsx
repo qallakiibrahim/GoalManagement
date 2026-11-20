@@ -571,6 +571,44 @@ export const DailyBoardPage: React.FC = () => {
 
       <ScopeBar />
 
+      {!readOnly && (
+        <Card className="p-3.5">
+          <form onSubmit={handleAddCard} className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-semibold text-[var(--muted)] whitespace-nowrap">
+              {t('Quick Log:', 'Snabblogga:')}
+            </span>
+            <input
+              type="text"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder={t(
+                'Capture deviation, blocker, or shift action and press Enter...',
+                'Skriv in avvikelse, hinder eller skiftåtgärd och tryck Enter...'
+              )}
+              className="flex-1 min-w-[220px] rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-1.5 text-xs text-[var(--ink)]"
+            />
+            <select
+              value={newRoute}
+              onChange={(e) => setNewRoute(e.target.value as PulseCard['routeType'])}
+              aria-label={t('Action path', 'Åtgärdsspår')}
+              className="rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 text-xs font-medium text-[var(--ink)]"
+            >
+              <option value="Direct fix">{t('Direct fix', 'Snabbåtgärd')}</option>
+              <option value="A3">A3</option>
+              <option value="Escalate">{t('Escalate', 'Eskalera')}</option>
+            </select>
+            <button
+              type="submit"
+              disabled={!newTitle.trim()}
+              className="inline-flex items-center gap-1 rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 disabled:opacity-45 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{t('Log Card', 'Lägg till')}</span>
+            </button>
+          </form>
+        </Card>
+      )}
+
       {/* Tier 1 View */}
       {dailyTier === 'tier1' && (
         <div className="space-y-6">

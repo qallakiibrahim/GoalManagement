@@ -18,9 +18,56 @@ import { BlockerSection } from '../ui/BlockerPanel';
 import { HelpTip } from '../ui/HelpTip';
 
 export const ProjectsListPage: React.FC = () => {
-  const { scope, goals, initiatives, projects, activeRole, navigate } = useWorkspace();
+  const {
+    scope,
+    goals,
+    initiatives,
+    projects,
+    activeRole,
+    navigate,
+    updateInitiativeFocus,
+    createProjectA3,
+    addProjectTask,
+    openQuickCreate,
+  } = useWorkspace();
   const { t, tScope } = useLanguage();
   const [sqdcFilter, setSqdcFilter] = useState<'ALL' | 'S' | 'Q' | 'D' | 'C' | 'BOTTLENECK'>('ALL');
+  const [quickTaskInitId, setQuickTaskInitId] = useState<string | null>(null);
+  const [quickTaskTitle, setQuickTaskTitle] = useState('');
+  const canWriteInit = roleCan(activeRole, 'initiativeWrite', null, { goals, initiatives });
+  const canCreateGoal = roleCan(activeRole, 'goalCreate', null, { goals, initiatives });
+
+  const handleQuickProgress = async (init: Initiative, delta: number) => {
+    const nextProgress = Math.max(0, Math.min(100, Number(init.progress || 0) + delta));
+    const nextStatus: Initiative['status'] =
+      nextProgress === 100 ? 'Completed' : nextProgress > 0 && init.status === 'Planned' ? 'On track' : init.status;
+    await updateInitiativeFocus(init.id, {
+      progress: nextProgress,
+      status: nextStatus,
+      valueStream: init.valueStream,
+      isBottleneck: init.isBottleneck,
+      sqdc: init.sqdc,
+    });
+  };
+
+  const handleQuickAddTask = async (init: Initiative) => {
+    if (!quickTaskTitle.trim()) return;
+    let targetProject = projects.find((p) => p.initiative === init.id);
+    let projectId = targetProject?.id || null;
+    if (!projectId) {
+      projectId = await createProjectA3({
+        title: init.title,
+        initiative: init.id,
+        owner: init.owner,
+        escalationTier: 'Direct Fix',
+      });
+    }
+    if (projectId) {
+      await addProjectTask(projectId, quickTaskTitle.trim(), init.owner);
+      setQuickTaskTitle('');
+      setQuickTaskInitId(null);
+    }
+  };
 
   const visInits = useMemo(() => {
     const base = initiatives.filter((i) => visibleInitiative(i, goals, activeRole));
@@ -42,16 +89,28 @@ export const ProjectsListPage: React.FC = () => {
         title={t('Initiatives & Project A3 Execution', 'Initiativ & Projekt-A3-genomförande')}
         subtitle={`${t('Strategic initiatives prioritized by SQDC (Safety, Quality, Delivery, Cost) & Theory of Constraints', 'Strategiska initiativ prioriterade enligt SQDC (Säkerhet, Kvalitet, Leverans, Kostnad) & flaskhalsteori (TOC)')} (${tScope(scope)}).`}
         actions={
-          roleCan(activeRole, 'initiativeWrite', null, { goals, initiatives }) && (
-            <button
-              type="button"
-              onClick={() => navigate('newinitiative')}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              {t('New Initiative', 'Nytt initiativ')}
-            </button>
-          )
+          <div className="flex flex-wrap items-center gap-2">
+            {canCreateGoal && (
+              <button
+                type="button"
+                onClick={openQuickCreate}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                {t('Quick Create Package', 'Snabbskapa målpaket')}
+              </button>
+            )}
+            {canWriteInit && (
+              <button
+                type="button"
+                onClick={() => navigate('newinitiative')}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                {t('New Initiative', 'Nytt initiativ')}
+              </button>
+            )}
+          </div>
         }
       />
 
@@ -147,38 +206,129 @@ export const ProjectsListPage: React.FC = () => {
                 <th className="px-4 py-2.5 font-semibold">{t('SQDC & Constraint', 'SQDC & Flaskhals')}</th>
                 <th className="px-4 py-2.5 font-semibold">{t('Progress', 'Framdrift')}</th>
                 <th className="px-4 py-2.5 font-semibold">Status</th>
+                {canWriteInit && (
+                  <th className="px-4 py-2.5 font-semibold text-right">{t('Quick Action', 'Snabbåtgärd')}</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
               {visInits.map((i) => {
                 const g = goalById(goals, i.goal);
+                const isAddingTask = quickTaskInitId === i.id;
                 return (
-                  <tr
-                    key={i.id}
-                    onClick={() => navigate('initiative', i.id)}
-                    className="hover:bg-[var(--surface-subtle)]/50 cursor-pointer"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-[var(--ink)]">
-                        <span className="font-mono text-[var(--muted)] mr-1.5">{i.id}</span>
-                        {i.title}
-                      </div>
-                      <div className="text-[11px] text-[var(--muted)] mt-0.5">{i.valueStream || t('Operational stream', 'Operativt flöde')}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-[var(--ink)]">{i.owner}</div>
-                      <div className="text-[11px] text-[var(--muted)]">
-                        {i.goal} {g ? `· ${g.title}` : ''}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <SqdcStrip initiative={i} />
-                    </td>
-                    <td className="px-4 py-3 font-mono font-bold tabular-nums">{i.progress}%</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge label={i.status} />
-                    </td>
-                  </tr>
+                  <React.Fragment key={i.id}>
+                    <tr
+                      onClick={() => navigate('initiative', i.id)}
+                      className="hover:bg-[var(--surface-subtle)]/50 cursor-pointer"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-[var(--ink)]">
+                          <span className="font-mono text-[var(--muted)] mr-1.5">{i.id}</span>
+                          {i.title}
+                        </div>
+                        <div className="text-[11px] text-[var(--muted)] mt-0.5">{i.valueStream || t('Operational stream', 'Operativt flöde')}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-[var(--ink)]">{i.owner}</div>
+                        <div className="text-[11px] text-[var(--muted)]">
+                          {i.goal} {g ? `· ${g.title}` : ''}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <SqdcStrip initiative={i} />
+                      </td>
+                      <td
+                        className="px-4 py-3"
+                        onClick={(e) => {
+                          if (canWriteInit) e.stopPropagation();
+                        }}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          {canWriteInit && (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickProgress(i, -10)}
+                              aria-label={t('Decrease progress by 10%', 'Minska framdrift med 10 %')}
+                              className="w-6 h-6 rounded border border-[var(--border-strong)] bg-[var(--bg)] text-[var(--ink)] hover:bg-[var(--surface-subtle)] font-mono text-xs cursor-pointer"
+                            >
+                              −
+                            </button>
+                          )}
+                          <span className="font-mono font-bold tabular-nums w-10 text-center">{i.progress}%</span>
+                          {canWriteInit && (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickProgress(i, 10)}
+                              aria-label={t('Increase progress by 10%', 'Öka framdrift med 10 %')}
+                              className="w-6 h-6 rounded border border-[var(--border-strong)] bg-[var(--bg)] text-[var(--ink)] hover:bg-[var(--surface-subtle)] font-mono text-xs cursor-pointer"
+                            >
+                              +
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge label={i.status} />
+                      </td>
+                      {canWriteInit && (
+                        <td
+                          className="px-4 py-3 text-right whitespace-nowrap"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQuickTaskInitId(isAddingTask ? null : i.id);
+                              setQuickTaskTitle('');
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-2 py-1 text-[11px] font-semibold text-[var(--ink)] hover:bg-[var(--surface-subtle)] cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>{t('Task', 'Uppgift')}</span>
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                    {isAddingTask && canWriteInit && (
+                      <tr className="bg-[var(--surface-subtle)]/40">
+                        <td colSpan={6} className="px-4 py-2.5">
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              handleQuickAddTask(i);
+                            }}
+                            className="flex flex-wrap items-center gap-2 text-xs"
+                          >
+                            <span className="font-semibold text-[var(--muted)] whitespace-nowrap">
+                              {t('New task for', 'Ny uppgift för')} {i.id}:
+                            </span>
+                            <input
+                              type="text"
+                              autoFocus
+                              value={quickTaskTitle}
+                              onChange={(e) => setQuickTaskTitle(e.target.value)}
+                              placeholder={t('Action description...', 'Beskriv åtgärden...')}
+                              className="flex-1 min-w-[200px] rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 py-1.5 text-xs text-[var(--ink)]"
+                            />
+                            <button
+                              type="submit"
+                              disabled={!quickTaskTitle.trim()}
+                              className="rounded-lg bg-teal-700 px-3 py-1.5 font-semibold text-white hover:bg-teal-800 disabled:opacity-45 dark:bg-teal-600 cursor-pointer"
+                            >
+                              {t('Add Task', 'Lägg till')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setQuickTaskInitId(null)}
+                              className="rounded-lg border border-[var(--border-strong)] px-2.5 py-1.5 font-semibold text-[var(--muted)] hover:text-[var(--ink)] cursor-pointer"
+                            >
+                              {t('Cancel', 'Avbryt')}
+                            </button>
+                          </form>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </tbody>

@@ -77,6 +77,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     retryWorkspaceSetup,
     theme,
     toggleTheme,
+    uiMode,
+    setUiMode,
+    openQuickCreate,
     route,
     navigate,
     actualRole,
@@ -88,6 +91,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     initiatives,
     projects,
     catchballs,
+    approvals,
     activities,
     markActivityRead,
   } = useWorkspace();
@@ -244,6 +248,26 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     },
   ];
 
+  const focusPrimaryItems: NavItem[] = [
+    { route: 'myfocus', label: t('My Focus', 'Mitt fokus'), icon: Compass },
+    { route: 'daily', label: 'Daily Board', icon: Kanban },
+    { route: 'goalskpis', label: t('Goals & KPIs', 'Mål & KPI'), icon: BarChart3 },
+    { route: 'projects', label: t('Initiatives', 'Initiativ'), icon: FolderKanban },
+    { route: 'reviews', label: t('PDCA & Exceptions', 'PDCA & Avvikelser'), icon: RefreshCw },
+    { route: 'governance', label: t('Governance & ISO', 'Styrning & ISO'), icon: Grid3X3 },
+  ];
+
+  const focusSecondaryItems: NavItem[] = [
+    { route: 'overview', label: t('Executive Overview', 'Översikt'), icon: LayoutDashboard },
+    { route: 'onboarding', label: t('Start from Zero', 'Starta från noll'), icon: Rocket },
+    { route: 'sop', label: t('SOP & User Guide', 'SOP & Användarguide'), icon: BookOpen },
+  ];
+
+  const pendingApprovalsCount = useMemo(
+    () => approvals.filter((a) => a.status === 'Pending').length,
+    [approvals]
+  );
+
   const quickSearchItems = useMemo(() => {
     const list: Array<{
       key: string;
@@ -253,7 +277,22 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       meta: string;
       route: AppRoute;
       id?: string;
-    }> = [];
+    }> = [
+      {
+        key: 'nav-goalskpis',
+        category: t('View', 'Vy'),
+        label: t('Goals & KPIs (Quick Entry)', 'Mål & KPI (Snabbinmatning)'),
+        meta: t('Focus Mode', 'Fokusläge'),
+        route: 'goalskpis',
+      },
+      {
+        key: 'nav-governance',
+        category: t('View', 'Vy'),
+        label: t('Governance & ISO Hub', 'Styrning & ISO (Samlad vy)'),
+        meta: t('X-Matrix · Catchball · Approvals · ISO', 'X-Matrix · Catchball · Godkännanden · ISO'),
+        route: 'governance',
+      },
+    ];
 
     for (const sec of sections) {
       for (const item of sec.items) {
@@ -432,10 +471,54 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   const isNavItemActive = (itemRoute: AppRoute) =>
     route === itemRoute ||
+    (itemRoute === 'goalskpis' && ['kpis', 'import', 'cascade', 'pillars', 'goal', 'newgoal'].includes(route)) ||
+    (itemRoute === 'governance' && ['matrix', 'a3', 'catchball', 'catchballnew', 'catchballitem', 'approvals', 'iso', 'evidence', 'management'].includes(route)) ||
     (itemRoute === 'cascade' && (route === 'goal' || route === 'newgoal')) ||
     (itemRoute === 'projects' && (route === 'initiative' || route === 'newinitiative' || route === 'project')) ||
     (itemRoute === 'catchball' && (route === 'catchballnew' || route === 'catchballitem')) ||
     (itemRoute === 'reviews' && (route === 'review' || route === 'newreview'));
+
+  const renderModeSwitcher = (collapsed: boolean) =>
+    collapsed ? null : (
+      <div className="border-t border-[var(--border)] px-3 py-2.5 space-y-1.5">
+        <div className="flex items-center justify-between text-[11px] font-semibold text-[var(--muted)]">
+          <span>{t('Workspace Mode', 'Arbetsläge')}</span>
+          <span className="font-mono text-[10px]">
+            {uiMode === 'focus' ? t('6 views', '6 vyer') : t('Full', 'Alla')}
+          </span>
+        </div>
+        <div
+          role="group"
+          aria-label={t('Workspace navigation mode', 'Navigeringsläge')}
+          className="grid grid-cols-2 rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] p-0.5 text-[11px] font-semibold"
+        >
+          <button
+            type="button"
+            onClick={() => setUiMode('focus')}
+            aria-pressed={uiMode === 'focus'}
+            className={`rounded-md py-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+              uiMode === 'focus'
+                ? 'bg-teal-700 text-white dark:bg-teal-600'
+                : 'text-[var(--muted)] hover:text-[var(--ink)]'
+            }`}
+          >
+            {t('Focus', 'Fokus')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setUiMode('full')}
+            aria-pressed={uiMode === 'full'}
+            className={`rounded-md py-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+              uiMode === 'full'
+                ? 'bg-teal-700 text-white dark:bg-teal-600'
+                : 'text-[var(--muted)] hover:text-[var(--ink)]'
+            }`}
+          >
+            {t('Full Hoshin', 'Fullt läge')}
+          </button>
+        </div>
+      </div>
+    );
 
   const renderNavList = (collapsed: boolean) => (
     <nav className={`flex-1 overflow-y-auto ${collapsed ? 'px-2 py-3 space-y-3' : 'px-3 py-3 space-y-1.5'}`}>
@@ -458,81 +541,150 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         </div>
       )}
 
-      {sections
-        .map((sec) => ({ ...sec, visibleItems: sec.items.filter((i) => !i.hidden) }))
-        .filter((sec) => sec.visibleItems.length > 0)
-        .map((sec, secIdx) => {
-          const isOpen = !!openSections[sec.id];
-          const hasActiveItem = sec.visibleItems.some((item) => isNavItemActive(item.route));
-          const showItems = collapsed || isOpen;
-
-          return (
-            <div key={sec.id} className={collapsed ? 'space-y-1' : 'space-y-1'}>
-              {!collapsed ? (
+      {uiMode === 'focus' ? (
+        <div className="space-y-3">
+          <div className="space-y-0.5">
+            {focusPrimaryItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = isNavItemActive(item.route);
+              const showCount =
+                item.route === 'governance' && !isBasic && pendingApprovalsCount > 0
+                  ? pendingApprovalsCount
+                  : 0;
+              return (
                 <button
+                  key={item.route}
                   type="button"
-                  aria-expanded={isOpen}
-                  onClick={() => toggleSection(sec.id)}
-                  className={`w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${
-                    hasActiveItem && !isOpen
-                      ? 'text-teal-700 bg-teal-600/8 dark:text-teal-300 dark:bg-teal-400/10'
-                      : isOpen
-                        ? 'text-[var(--ink)] bg-[var(--surface-subtle)]/60'
-                        : 'text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)]'
+                  title={collapsed ? item.label : undefined}
+                  aria-label={item.label}
+                  onClick={() => {
+                    navigate(item.route);
+                    setMobileOpen(false);
+                  }}
+                  className={`w-full flex items-center rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    collapsed ? 'justify-center px-0 py-2.5' : 'justify-between gap-2 px-2.5 py-2.5'
+                  } ${
+                    isActive
+                      ? 'bg-teal-600/10 text-teal-800 ring-1 ring-inset ring-teal-700/15 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-400/20'
+                      : 'text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)]'
                   }`}
                 >
-                  <span className="flex items-center gap-2 truncate">
-                    <span className="truncate">{sec.title}</span>
-                    {hasActiveItem && !isOpen && (
-                      <span
-                        className="w-1.5 h-1.5 rounded-full bg-teal-600 dark:bg-teal-400 shrink-0"
-                        aria-hidden="true"
-                      />
-                    )}
+                  <span className={`flex items-center ${collapsed ? '' : 'gap-2.5 min-w-0'}`}>
+                    <Icon className={`${collapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'} shrink-0`} />
+                    {!collapsed && <span className="truncate">{item.label}</span>}
                   </span>
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${
-                      isOpen ? 'rotate-180' : ''
-                    }`}
-                  />
+                  {!collapsed && showCount > 0 && (
+                    <span className="font-mono tabular-nums text-[11px] text-amber-700 dark:text-amber-400 shrink-0">
+                      {showCount}
+                    </span>
+                  )}
                 </button>
-              ) : (
-                secIdx > 0 && <div className="mx-2 my-1 border-t border-[var(--border)]" />
-              )}
+              );
+            })}
+          </div>
 
-              {showItems && (
-                <div className={`space-y-0.5 ${!collapsed ? 'pb-1.5' : ''}`}>
-                  {sec.visibleItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = isNavItemActive(item.route);
-                    return (
-                      <button
-                        key={item.route}
-                        type="button"
-                        title={collapsed ? item.label : undefined}
-                        aria-label={item.label}
-                        onClick={() => {
-                          navigate(item.route);
-                          setMobileOpen(false);
-                        }}
-                        className={`w-full flex items-center rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                          collapsed ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-2.5 py-2'
-                        } ${
-                          isActive
-                            ? 'bg-teal-600/10 text-teal-800 ring-1 ring-inset ring-teal-700/15 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-400/20'
-                            : 'text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)]'
-                        }`}
-                      >
-                        <Icon className={`${collapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'} shrink-0`} />
-                        {!collapsed && <span className="truncate">{item.label}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+          <div className="mx-2 border-t border-[var(--border)]" />
+
+          <div className="space-y-0.5">
+            {focusSecondaryItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = route === item.route;
+              return (
+                <button
+                  key={item.route}
+                  type="button"
+                  title={collapsed ? item.label : undefined}
+                  aria-label={item.label}
+                  onClick={() => {
+                    navigate(item.route);
+                    setMobileOpen(false);
+                  }}
+                  className={`w-full flex items-center rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    collapsed ? 'justify-center px-0 py-2' : 'gap-2.5 px-2.5 py-2'
+                  } ${
+                    isActive
+                      ? 'bg-teal-600/10 text-teal-800 ring-1 ring-inset ring-teal-700/15 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-400/20'
+                      : 'text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <Icon className={`${collapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'} shrink-0`} />
+                  {!collapsed && <span className="truncate">{item.label}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        sections
+          .map((sec) => ({ ...sec, visibleItems: sec.items.filter((i) => !i.hidden) }))
+          .filter((sec) => sec.visibleItems.length > 0)
+          .map((sec, secIdx) => {
+            const isOpen = !!openSections[sec.id];
+            const hasActiveItem = sec.visibleItems.some((item) => isNavItemActive(item.route));
+            const showItems = collapsed || isOpen;
+
+            return (
+              <div key={sec.id} className={collapsed ? 'space-y-1' : 'space-y-1'}>
+                {!collapsed ? (
+                  <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    onClick={() => toggleSection(sec.id)}
+                    className={`w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+                      hasActiveItem && !isOpen
+                        ? 'text-teal-700 bg-teal-600/8 dark:text-teal-300 dark:bg-teal-400/10'
+                        : isOpen
+                          ? 'text-[var(--ink)] bg-[var(--surface-subtle)]/60'
+                          : 'text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)]'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 truncate">
+                      <span className="truncate">{sec.title}</span>
+                    </span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${
+                        isOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                ) : (
+                  secIdx > 0 && <div className="mx-2 my-1 border-t border-[var(--border)]" />
+                )}
+
+                {showItems && (
+                  <div className={`space-y-0.5 ${!collapsed ? 'pb-1.5' : ''}`}>
+                    {sec.visibleItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = isNavItemActive(item.route);
+                      return (
+                        <button
+                          key={item.route}
+                          type="button"
+                          title={collapsed ? item.label : undefined}
+                          aria-label={item.label}
+                          onClick={() => {
+                            navigate(item.route);
+                            setMobileOpen(false);
+                          }}
+                          className={`w-full flex items-center rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                            collapsed ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-2.5 py-2'
+                          } ${
+                            isActive
+                              ? 'bg-teal-600/10 text-teal-800 ring-1 ring-inset ring-teal-700/15 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-400/20'
+                              : 'text-[var(--muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--ink)]'
+                          }`}
+                        >
+                          <Icon className={`${collapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'} shrink-0`} />
+                          {!collapsed && <span className="truncate">{item.label}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })
+      )}
     </nav>
   );
 
@@ -599,11 +751,11 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           {canCreateGoal && (
             <button
               type="button"
-              onClick={() => navigate('newgoal')}
-              className="hidden sm:inline-flex h-8 items-center gap-1.5 rounded-lg bg-teal-700 px-3 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
+              onClick={openQuickCreate}
+              className="hidden sm:inline-flex h-8 items-center gap-1.5 rounded-lg bg-teal-700 px-3 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer whitespace-nowrap shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>{t('New Goal', 'Nytt mål')}</span>
+              <span>{t('Quick Create', 'Snabbskapa')}</span>
             </button>
           )}
           <div
@@ -771,6 +923,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           }`}
         >
           {renderNavList(sidebarCollapsed)}
+          {renderModeSwitcher(sidebarCollapsed)}
           {isActualAdmin && !sidebarCollapsed && (
             <div className="border-t border-[var(--border)] p-3.5 space-y-1.5">
               <label className="block text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
@@ -807,6 +960,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 </button>
               </div>
               {renderNavList(false)}
+              {renderModeSwitcher(false)}
             </aside>
           </div>
         )}

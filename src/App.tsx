@@ -24,6 +24,9 @@ import { EvidencePage, IsoPage, ManagementReviewPage } from './components/pages/
 import { SettingsPage } from './components/pages/SettingsPage';
 import { SopGuidePage } from './components/pages/SopGuidePage';
 import { OnboardingWizardPage } from './components/pages/OnboardingWizardPage';
+import { GoalsKpisHubPage } from './components/pages/GoalsKpisHubPage';
+import { GovernanceHubPage } from './components/pages/GovernanceHubPage';
+import { QuickCreateDrawer } from './components/ui/QuickCreateDrawer';
 
 const RouteView: React.FC = () => {
   const { route, activeRole, isActualAdmin } = useWorkspace();
@@ -47,6 +50,10 @@ const RouteView: React.FC = () => {
       return <DailyBoardPage />;
     case 'myfocus':
       return <MyFocusPage />;
+    case 'goalskpis':
+      return <GoalsKpisHubPage />;
+    case 'governance':
+      return <GovernanceHubPage />;
     case 'pillars':
       return <PillarsPage />;
     case 'cascade':
@@ -104,6 +111,7 @@ export default function App() {
           <AppShell>
             <RouteView />
           </AppShell>
+          <QuickCreateDrawer />
           <WalkthroughOverlay />
         </WalkthroughProvider>
       </WorkspaceProvider>

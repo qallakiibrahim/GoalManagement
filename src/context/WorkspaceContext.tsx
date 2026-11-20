@@ -50,6 +50,7 @@ import {
   SafetyDayState,
   StrategicGoal,
   StrategyPlan,
+  UiMode,
   UserProfile,
   WorkspaceActivity,
   WorkspaceDoc,
@@ -122,6 +123,8 @@ const ROUTE_GROUP_MAP: Record<AppRoute, RouteGroup> = {
   onboarding: 'overview',
   daily: 'daily',
   myfocus: 'daily',
+  goalskpis: 'performance',
+  governance: 'compliance',
   pillars: 'strategy',
   cascade: 'strategy',
   matrix: 'strategy',
@@ -201,9 +204,14 @@ interface WorkspaceContextValue {
   seedOrResetWorkspace: () => Promise<void>;
   retryWorkspaceSetup: () => Promise<void>;
 
-  // Theme & Navigation
+  // Theme, UI Mode & Navigation
   theme: 'dark' | 'light';
   toggleTheme: () => void;
+  uiMode: UiMode;
+  setUiMode: (mode: UiMode) => void;
+  quickCreateOpen: boolean;
+  openQuickCreate: () => void;
+  closeQuickCreate: () => void;
   route: AppRoute;
   routeId: string;
   routeGroup: RouteGroup;
@@ -397,6 +405,27 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return 'dark';
     }
   });
+
+  const [uiMode, setUiModeState] = useState<UiMode>(() => {
+    try {
+      return localStorage.getItem('safeqms_ui_mode') === 'full' ? 'full' : 'focus';
+    } catch {
+      return 'focus';
+    }
+  });
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+
+  const setUiMode = useCallback((mode: UiMode) => {
+    setUiModeState(mode);
+    try {
+      localStorage.setItem('safeqms_ui_mode', mode);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const openQuickCreate = useCallback(() => setQuickCreateOpen(true), []);
+  const closeQuickCreate = useCallback(() => setQuickCreateOpen(false), []);
 
   const [navState, setNavState] = useState<{ route: AppRoute; routeId: string }>(parseHashRoute);
   const [previewRole, setPreviewRoleState] = useState<SafeQmsRole | null>(null);
@@ -3655,6 +3684,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     retryWorkspaceSetup,
     theme,
     toggleTheme,
+    uiMode,
+    setUiMode,
+    quickCreateOpen,
+    openQuickCreate,
+    closeQuickCreate,
     route: navState.route,
     routeId: navState.routeId,
     routeGroup: ROUTE_GROUP_MAP[navState.route] || 'overview',

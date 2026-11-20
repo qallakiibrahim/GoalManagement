@@ -40,6 +40,7 @@ export const OverviewPage: React.FC = () => {
     domainSnapshot,
     navigate,
     toggleTaskStatus,
+    openQuickCreate,
   } = useWorkspace();
 
   const isBasic = activeRole === 'Basic user';
@@ -81,22 +82,40 @@ export const OverviewPage: React.FC = () => {
               : t('Hoshin Kanri alignment from multi-year strategic pillars through annual KPIs, initiatives, and daily Tier 1–3 execution.', 'Hoshin Kanri från fleråriga strategiska pelare till årsmål, KPI:er, initiativ och daglig styrning Nivå 1–3.')
         }
         actions={
-          <>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('myfocus')}
+              className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--surface-subtle)] cursor-pointer whitespace-nowrap"
+            >
+              {t('My Focus', 'Mitt fokus')}
+            </button>
             <button
               type="button"
               onClick={() => navigate('daily')}
-              className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--surface-subtle)] cursor-pointer"
+              className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--surface-subtle)] cursor-pointer whitespace-nowrap"
             >
               Daily Board
             </button>
-            <button
-              type="button"
-              onClick={() => navigate('matrix')}
-              className="rounded-lg bg-teal-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
-            >
-              {t('Open X-Matrix', 'Öppna X-Matrix')}
-            </button>
-          </>
+            {roleCan(activeRole, 'goalCreate', null, { goals, initiatives }) ? (
+              <button
+                type="button"
+                onClick={openQuickCreate}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{t('Quick Create', 'Snabbskapa')}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate('governance', 'matrix')}
+                className="rounded-lg bg-teal-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                {t('Open X-Matrix', 'Öppna X-Matrix')}
+              </button>
+            )}
+          </div>
         }
       />
 

@@ -42,12 +42,16 @@ export type RouteGroup =
   | 'compliance'
   | 'settings';
 
+export type UiMode = 'focus' | 'full';
+
 export type AppRoute =
   | 'overview'
   | 'sop'
   | 'onboarding'
   | 'daily'
   | 'myfocus'
+  | 'goalskpis'
+  | 'governance'
   | 'pillars'
   | 'cascade'
   | 'matrix'
